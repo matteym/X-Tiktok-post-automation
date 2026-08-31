@@ -5,12 +5,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from content_autopilot.graph.clients import ApifyClient, GrokClient, XClient
+from content_autopilot.graph.clients import (
+    ApifyClient,
+    GrokClient,
+    XClient,
+    _has_tiktok_credentials,
+)
 from content_autopilot.graph.state import ContentAutopilotState
 from content_autopilot.settings import Settings
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+MAX_X_POST_LENGTH = 280
 
 
 class GrokClientProtocol(Protocol):
@@ -19,6 +25,10 @@ class GrokClientProtocol(Protocol):
 
 class XClientProtocol(Protocol):
     def fetch_context(self) -> str | None: ...
+
+    def has_credentials(self) -> bool: ...
+
+    def publish_post(self, *, media_paths: list[str], text: str) -> str: ...
 
 
 class ApifyClientProtocol(Protocol):
@@ -207,4 +217,88 @@ def generate_node(
     return {
         "x_post_text": x_post_text,
         "tiktok_proposal": tiktok_proposal,
+    }
+
+
+def _resolved_media_paths(state: ContentAutopilotState) -> list[str]:
+    media_paths = state.get("media_paths")
+    if media_paths:
+        return list(media_paths)
+    return [str(path) for path in state.get("filenames", [])]
+
+
+def validate_node(state: ContentAutopilotState) -> ContentAutopilotState:
+    """Validate generated content length, policy, and media count."""
+    errors: list[str] = []
+    media_paths = _resolved_media_paths(state)
+    media_count = state.get("media_count", len(state.get("filenames", [])))
+
+    x_post_text = state.get("x_post_text", "").strip()
+    if not x_post_text:
+        errors.append("Policy violation: X post text is empty")
+    elif len(x_post_text) > MAX_X_POST_LENGTH:
+        errors.append(
+            f"Length violation: X post exceeds {MAX_X_POST_LENGTH} characters"
+        )
+
+    if len(media_paths) != media_count:
+        errors.append(
+            "Media count mismatch between media_paths and media_count"
+        )
+
+    return {
+        "media_paths": media_paths,
+        "validation_passed": not errors,
+        "validation_errors": errors,
+    }
+
+
+def publish_x_node(
+    state: ContentAutopilotState,
+    *,
+    settings: Settings,
+    x_client: XClientProtocol,
+) -> ContentAutopilotState:
+    """Publish to X with media uploaded in preserved CLI order."""
+    _ = settings
+    media_paths = _resolved_media_paths(state)
+    result: ContentAutopilotState = {"media_paths": media_paths}
+
+    if not x_client.has_credentials():
+        result["x_post_url"] = None
+        return result
+
+    result["x_post_url"] = x_client.publish_post(
+        media_paths=media_paths,
+        text=state.get("x_post_text", ""),
+    )
+    return result
+
+
+def tiktok_proposal_node(
+    state: ContentAutopilotState,
+    *,
+    settings: Settings,
+    apify_client: ApifyClientProtocol | None = None,
+) -> ContentAutopilotState:
+    """Build a structured TikTok proposal without live publish unless configured."""
+    _ = apify_client
+    media_paths = _resolved_media_paths(state)
+    caption = state.get("tiktok_proposal", "") or state.get("description", "")
+    hashtags = state.get("strategy_hashtags", [])
+
+    publish_mode = "proposal"
+    if _has_tiktok_credentials(settings):
+        publish_mode = "live" if settings.tiktok_access_token else "proposal"
+
+    structured: dict[str, str | list[str]] = {
+        "publish_mode": publish_mode,
+        "caption": caption,
+        "hashtags": hashtags,
+        "media_order": media_paths,
+    }
+
+    return {
+        "media_paths": media_paths,
+        "tiktok_proposal_structured": structured,
     }

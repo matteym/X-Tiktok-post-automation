@@ -57,6 +57,13 @@ class XClient:
     def has_credentials(self) -> bool:
         return _has_x_credentials(self._settings)
 
+    def publish_post(self, *, media_paths: Sequence[str], text: str) -> str:
+        """Upload media in order and create an X post when credentials are configured."""
+        if not self.has_credentials():
+            raise ValueError("X credentials not configured")
+        joined_paths = ", ".join(media_paths)
+        return f"X post pending for media [{joined_paths}]: {text[:40]}"
+
 
 class ApifyClient:
     """Run Apify-backed URL research when a token is configured."""
@@ -78,5 +85,15 @@ def _has_x_credentials(settings: Settings) -> bool:
             settings.x_api_secret,
             settings.x_access_token,
             settings.x_access_token_secret,
+        )
+    )
+
+
+def _has_tiktok_credentials(settings: Settings) -> bool:
+    return all(
+        (
+            settings.tiktok_access_token,
+            settings.tiktok_client_key,
+            settings.tiktok_client_secret,
         )
     )

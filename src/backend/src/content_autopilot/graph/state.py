@@ -10,6 +10,7 @@ class ContentAutopilotState(TypedDict, total=False):
 
     description: str
     filenames: list[str]
+    media_paths: list[str]
     media_fingerprints: list[str]
     github_url: str | None
     tiktok_url: str | None
@@ -25,3 +26,7 @@ class ContentAutopilotState(TypedDict, total=False):
     strategy_hashtags: list[str]
     x_post_text: str
     tiktok_proposal: str
+    validation_passed: bool
+    validation_errors: list[str]
+    x_post_url: str | None
+    tiktok_proposal_structured: dict[str, str | list[str]]
