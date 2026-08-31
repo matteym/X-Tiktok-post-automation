@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from typer.testing import CliRunner
@@ -154,10 +155,30 @@ def test_cli_run_rejects_missing_video_path(tmp_path: Path) -> None:
 
 def test_cli_run_accepts_multiple_videos_and_optional_urls(
     media_files: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from content_autopilot.cli import app
 
     first, second, third = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        "x_post_url": "https://x.com/example/status/123456789",
+        "tiktok_proposal": "Launch recap proposal",
+        "tiktok_proposal_structured": {
+            "publish_mode": "proposal",
+            "caption": "Launch recap proposal",
+            "hashtags": ["#launch"],
+            "media_order": [str(first), str(second), str(third)],
+        },
+    }
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setenv("GROK_API_KEY", "test-grok-api-key")
+    monkeypatch.setattr(
+        "content_autopilot.orchestration.build_content_autopilot_graph",
+        lambda _settings, **kwargs: mock_graph,
+    )
+
     result = runner.invoke(
         app,
         [

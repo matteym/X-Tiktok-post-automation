@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from content_autopilot.media.run_inputs import collect_run_media
+from content_autopilot.orchestration import execute_run
 
 app = typer.Typer(name="content-autopilot")
 
@@ -43,21 +43,15 @@ def run(
         typer.Option("--tiktok", help="Optional TikTok input URL for context"),
     ] = None,
 ) -> None:
-    """Validate media inputs and compute ordered fingerprints for publishing."""
-    try:
-        collected = collect_run_media(
-            video_paths=video,
-            description=description,
-            github_url=github,
-            tiktok_url=tiktok,
-        )
-    except FileNotFoundError as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(code=1) from exc
-
-    typer.echo(f"description: {collected.description}")
-    typer.echo(f"media_fingerprints: {','.join(collected.media_fingerprints)}")
-    typer.echo(f"media_set_hash: {collected.media_set_hash}")
+    """Run dedup checks, LangGraph pipeline, and metadata persistence."""
+    exit_code = execute_run(
+        video_paths=video,
+        description=description,
+        github_url=github,
+        tiktok_url=tiktok,
+        echo=typer.echo,
+    )
+    raise typer.Exit(code=exit_code)
 
 
 def main() -> None:
