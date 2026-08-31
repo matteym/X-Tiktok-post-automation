@@ -1,0 +1,84 @@
+# generated-by: agent-loop
+# Written at yarn run init. Missing languages are skipped; failing tests fail the job.
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v5
+        continue-on-error: true
+      - uses: actions/setup-go@v5
+        continue-on-error: true
+        with:
+          go-version: "1.23"
+      - uses: dtolnay/rust-toolchain@stable
+        continue-on-error: true
+      - name: TypeScript yarn test
+        shell: bash
+        run: |
+          found=0
+          failed=0
+          while IFS= read -r f; do
+            if ! node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); process.exit(p.scripts && p.scripts.test ? 0 : 1)" "$f"; then
+              continue
+            fi
+            found=1
+            dir=$(dirname "$f")
+            if ! (cd "$dir" && yarn install && yarn test); then
+              failed=1
+            fi
+          done < <(find . -path ./dag -prune -o -path '*/node_modules/*' -prune -o -path '*/.git/*' -prune -o -path '*/.venv/*' -prune -o -name package.json -print)
+          if [ "$found" -eq 0 ]; then echo "no TypeScript test packages, skip"; exit 0; fi
+          exit "$failed"
+      - name: Python pytest
+        shell: bash
+        run: |
+          if ! command -v uv >/dev/null 2>&1; then echo "uv missing, skip"; exit 0; fi
+          found=0
+          failed=0
+          while IFS= read -r f; do
+            found=1
+            dir=$(dirname "$f")
+            if ! (cd "$dir" && uv run python -m pytest -q); then
+              failed=1
+            fi
+          done < <(find . -path ./dag -prune -o -path '*/node_modules/*' -prune -o -path '*/.git/*' -prune -o -path '*/.venv/*' -prune -o -name pyproject.toml -print)
+          if [ "$found" -eq 0 ]; then echo "no Python packages, skip"; exit 0; fi
+          exit "$failed"
+      - name: Go test
+        shell: bash
+        run: |
+          if ! command -v go >/dev/null 2>&1; then echo "go missing, skip"; exit 0; fi
+          found=0
+          failed=0
+          while IFS= read -r f; do
+            found=1
+            dir=$(dirname "$f")
+            if ! (cd "$dir" && go test ./...); then
+              failed=1
+            fi
+          done < <(find . -path ./dag -prune -o -path '*/node_modules/*' -prune -o -path '*/.git/*' -prune -o -path '*/.venv/*' -prune -o -name go.mod -print)
+          if [ "$found" -eq 0 ]; then echo "no Go packages, skip"; exit 0; fi
+          exit "$failed"
+      - name: Rust cargo test
+        shell: bash
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then echo "cargo missing, skip"; exit 0; fi
+          found=0
+          failed=0
+          while IFS= read -r f; do
+            found=1
+            dir=$(dirname "$f")
+            if ! (cd "$dir" && cargo test); then
+              failed=1
+            fi
+          done < <(find . -path ./dag -prune -o -path '*/node_modules/*' -prune -o -path '*/.git/*' -prune -o -path '*/.venv/*' -prune -o -name Cargo.toml -print)
+          if [ "$found" -eq 0 ]; then echo "no Rust packages, skip"; exit 0; fi
+          exit "$failed"

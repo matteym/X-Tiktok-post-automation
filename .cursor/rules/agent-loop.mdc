@@ -1,0 +1,14 @@
+---
+description: Cursor SDK DAG protocol. Agent commits only on COMMIT NOW with the exact dag.json message.
+alwaysApply: true
+---
+
+# DAG / SDK
+
+Follow `.cursor/skills/agent-loop/SKILL.md`. You are one `Agent.send` for the current DAG node only (`--dagfile` or `dag/metadata/task.json`). Operator manual: `dag/README.md`.
+
+Do not `git push`, `--no-verify`, `terraform apply`, or `terraform destroy`. Do not `git commit` unless this send is COMMIT NOW. On COMMIT NOW, use the exact `commit` string from the DAG (briefing). Orchestrator runs TDD when the node has tests, then guard, tests from the DAG JSON, COMMIT NOW, archive to sibling `*.done.json`.
+
+`run.wait()` status must be `finished`. `error` and `cancelled` fail the node.
+
+No new `fallback-secret`. No hardcoded localhost URLs in application source (use env vars). No new `any`, `@ts-ignore`, or `eslint-disable`. No Countly. Ticket DAG wins on product scope.
