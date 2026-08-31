@@ -19,3 +19,9 @@ class ContentAutopilotState(TypedDict, total=False):
     x_context: str | None
     web_research: str | None
     research_summary: str
+    analysis_insights: str
+    strategy_angle: str
+    strategy_tone: str
+    strategy_hashtags: list[str]
+    x_post_text: str
+    tiktok_proposal: str

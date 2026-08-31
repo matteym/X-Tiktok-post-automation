@@ -114,3 +114,97 @@ def research_node(
         "web_research": web_research,
         "research_summary": research_summary,
     }
+
+
+def _parse_strategy_response(text: str) -> tuple[str, str, list[str]]:
+    angle = ""
+    tone = ""
+    hashtags: list[str] = []
+    for line in text.splitlines():
+        lowered = line.lower()
+        if lowered.startswith("angle:"):
+            angle = line.split(":", 1)[1].strip()
+        elif lowered.startswith("tone:"):
+            tone = line.split(":", 1)[1].strip()
+        elif lowered.startswith("hashtags:"):
+            hashtags = line.split(":", 1)[1].strip().split()
+    return angle, tone, hashtags
+
+
+def _parse_generate_response(text: str) -> tuple[str, str]:
+    x_post_text = text.strip()
+    tiktok_proposal = text.strip()
+    for line in text.splitlines():
+        lowered = line.lower()
+        if lowered.startswith("x post:"):
+            x_post_text = line.strip()
+        elif lowered.startswith("tiktok proposal:"):
+            tiktok_proposal = line.strip()
+    return x_post_text, tiktok_proposal
+
+
+def analyze_node(
+    state: ContentAutopilotState,
+    *,
+    grok_client: GrokClientProtocol,
+) -> ContentAutopilotState:
+    """Synthesize research outputs into actionable insights."""
+    prompt = "\n".join(
+        [
+            "Analyze this content-autopilot research and extract key insights.",
+            f"Understanding: {state.get('understanding_summary', '')}",
+            f"Research summary: {state.get('research_summary', '')}",
+            f"X context: {state.get('x_context') or 'none'}",
+            f"Web research: {state.get('web_research') or 'none'}",
+        ]
+    )
+    analysis_insights = grok_client.generate(prompt)
+    return {"analysis_insights": analysis_insights}
+
+
+def strategy_node(
+    state: ContentAutopilotState,
+    *,
+    grok_client: GrokClientProtocol,
+) -> ContentAutopilotState:
+    """Define the X and TikTok angle, tone, and hashtags."""
+    prompt = "\n".join(
+        [
+            "Create a cross-platform content strategy for X and TikTok.",
+            f"Description: {state.get('description', '')}",
+            f"Analysis insights: {state.get('analysis_insights', '')}",
+            "Return Angle, Tone, and Hashtags on separate lines.",
+        ]
+    )
+    strategy_text = grok_client.generate(prompt)
+    angle, tone, hashtags = _parse_strategy_response(strategy_text)
+    return {
+        "strategy_angle": angle,
+        "strategy_tone": tone,
+        "strategy_hashtags": hashtags,
+    }
+
+
+def generate_node(
+    state: ContentAutopilotState,
+    *,
+    grok_client: GrokClientProtocol,
+) -> ContentAutopilotState:
+    """Draft the X post text and TikTok proposal caption/script."""
+    hashtags = state.get("strategy_hashtags", [])
+    prompt = "\n".join(
+        [
+            "Generate draft content for X and TikTok.",
+            f"Description: {state.get('description', '')}",
+            f"Strategy angle: {state.get('strategy_angle', '')}",
+            f"Strategy tone: {state.get('strategy_tone', '')}",
+            f"Strategy hashtags: {' '.join(hashtags)}",
+            "Return X post and TikTok proposal on separate lines.",
+        ]
+    )
+    generated = grok_client.generate(prompt)
+    x_post_text, tiktok_proposal = _parse_generate_response(generated)
+    return {
+        "x_post_text": x_post_text,
+        "tiktok_proposal": tiktok_proposal,
+    }
