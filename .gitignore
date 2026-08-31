@@ -1,0 +1,13 @@
+.env
+node_modules/
+dist/
+.venv/
+dag/node_modules/
+dag/metadata/state.json
+dag/metadata/task.json
+dag/metadata/*.done.json
+dag/metadata/agent-id
+dag/history/*
+!dag/history/.gitkeep
+dag/logs/*.log
+agent-loop-autonomous-TDD-dag-runner/
