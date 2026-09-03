@@ -63,6 +63,8 @@ def execute_run(
     *,
     github_url: str | None = None,
     tiktok_url: str | None = None,
+    title: str | None = None,
+    youtube_url: str | None = None,
     settings: Settings | None = None,
     repository: PostRunRepository | None = None,
     graph: Any | None = None,
@@ -79,6 +81,8 @@ def execute_run(
             description=description,
             github_url=github_url,
             tiktok_url=tiktok_url,
+            title=title,
+            youtube_url=youtube_url,
         )
     except FileNotFoundError as exc:
         write(str(exc))
@@ -104,11 +108,13 @@ def execute_run(
     compiled_graph = graph or build_content_autopilot_graph(active_settings)
     initial_state = {
         "description": collected.description,
+        "title": collected.title,
         "filenames": collected.filenames,
         "media_paths": [str(path) for path in collected.video_paths],
         "media_fingerprints": collected.media_fingerprints,
         "github_url": collected.github_url,
         "tiktok_url": collected.tiktok_url,
+        "youtube_url": collected.youtube_url,
     }
 
     write("Starting content-autopilot pipeline...")

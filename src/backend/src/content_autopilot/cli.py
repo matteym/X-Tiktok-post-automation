@@ -42,6 +42,17 @@ def run(
         str | None,
         typer.Option("--tiktok", help="Optional TikTok input URL for context"),
     ] = None,
+    title: Annotated[
+        str | None,
+        typer.Option("--title", help="Optional YouTube snippet title"),
+    ] = None,
+    youtube: Annotated[
+        str | None,
+        typer.Option(
+            "--youtube",
+            help="Optional YouTube research URL for context (not the published watch URL)",
+        ),
+    ] = None,
 ) -> None:
     """Run dedup checks, LangGraph pipeline, and metadata persistence."""
     exit_code = execute_run(
@@ -49,6 +60,8 @@ def run(
         description=description,
         github_url=github,
         tiktok_url=tiktok,
+        title=title,
+        youtube_url=youtube,
         echo=typer.echo,
     )
     raise typer.Exit(code=exit_code)
