@@ -26,6 +26,7 @@ PIPELINE_STEPS = (
     "Validate",
     "Publish",
     "TikTok",
+    "YouTube",
 )
 
 
@@ -41,6 +42,7 @@ def _format_duplicate_warning(existing: PostRun) -> str:
             DUPLICATE_WARNING,
             f"description: {existing.description}",
             f"x_post_url: {existing.x_post_url or 'none'}",
+            f"youtube_video_url: {existing.youtube_video_url or 'none'}",
             f"created_at: {existing.created_at.isoformat()}",
         )
     )
@@ -63,6 +65,8 @@ def execute_run(
     *,
     github_url: str | None = None,
     tiktok_url: str | None = None,
+    title: str | None = None,
+    youtube_url: str | None = None,
     settings: Settings | None = None,
     repository: PostRunRepository | None = None,
     graph: Any | None = None,
@@ -79,6 +83,8 @@ def execute_run(
             description=description,
             github_url=github_url,
             tiktok_url=tiktok_url,
+            title=title,
+            youtube_url=youtube_url,
         )
     except FileNotFoundError as exc:
         write(str(exc))
@@ -104,11 +110,13 @@ def execute_run(
     compiled_graph = graph or build_content_autopilot_graph(active_settings)
     initial_state = {
         "description": collected.description,
+        "title": collected.title,
         "filenames": collected.filenames,
         "media_paths": [str(path) for path in collected.video_paths],
         "media_fingerprints": collected.media_fingerprints,
         "github_url": collected.github_url,
         "tiktok_url": collected.tiktok_url,
+        "youtube_url": collected.youtube_url,
     }
 
     write("Starting content-autopilot pipeline...")
@@ -117,10 +125,17 @@ def execute_run(
 
     result = compiled_graph.invoke(initial_state)
 
+    if result.get("validation_passed") is False:
+        errors = result.get("validation_errors") or []
+        write("Validation failed: " + "; ".join(errors))
+        return 1
+
     x_post_url = result.get("x_post_url")
     write(f"X post URL: {x_post_url or 'none'}")
     structured = result.get("tiktok_proposal_structured") or {}
     write(_format_tiktok_summary(structured))
+    youtube_video_url = result.get("youtube_video_url")
+    write(f"YouTube watch URL: {youtube_video_url or 'none'}")
 
     tiktok_proposal_value: str | None
     if structured:
@@ -133,9 +148,12 @@ def execute_run(
         media_fingerprints=collected.media_fingerprints,
         filenames=collected.filenames,
         description=collected.description,
+        title=collected.title,
         github_url=collected.github_url,
         tiktok_url=collected.tiktok_url,
+        youtube_url=collected.youtube_url,
         x_post_url=x_post_url,
+        youtube_video_url=youtube_video_url,
         tiktok_proposal=tiktok_proposal_value,
     )
 

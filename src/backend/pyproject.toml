@@ -9,8 +9,11 @@ dependencies = [
     "pydantic-settings",
     "typer",
     "sqlalchemy",
+    "psycopg[binary]",
     "httpx",
     "python-dotenv",
+    "google-api-python-client",
+    "google-auth-oauthlib",
 ]
 
 [project.scripts]

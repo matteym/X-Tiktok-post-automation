@@ -16,6 +16,7 @@ RESEARCHED_STATE: dict[str, Any] = {
     "media_fingerprints": ["deadbeef:1024", "cafebabe:2048"],
     "github_url": "https://github.com/example/repo",
     "tiktok_url": "https://www.tiktok.com/@creator/video/1",
+    "youtube_url": "https://www.youtube.com/watch?v=research-hint",
     "media_count": 2,
     "media_types": ["video", "photo"],
     "understanding_summary": "Understood launch recap with two media files",
@@ -50,7 +51,9 @@ STRATEGY_GROK_RESPONSE = (
 
 GENERATE_GROK_RESPONSE = (
     "X post: Ship faster with our new CLI workflow.\n"
-    "TikTok proposal: 30s demo script showing ordered media upload and publish."
+    "TikTok proposal: 30s demo script showing ordered media upload and publish.\n"
+    "YouTube title: Launch recap for our CLI workflow\n"
+    "YouTube description: Watch how ordered media upload and publish works in practice."
 )
 
 
@@ -64,6 +67,10 @@ def test_content_autopilot_state_includes_generation_fields() -> None:
     assert "strategy_hashtags" in annotations
     assert "x_post_text" in annotations
     assert "tiktok_proposal" in annotations
+    assert "youtube_url" in annotations
+    assert "youtube_title" in annotations
+    assert "youtube_description" in annotations
+    assert "youtube_video_url" in annotations
 
 
 def test_analyze_node_synthesizes_research_into_insights(
@@ -127,10 +134,36 @@ def test_generate_node_drafts_x_post_and_tiktok_proposal(
 
     assert "CLI workflow" in result["x_post_text"]
     assert "TikTok proposal" in result["tiktok_proposal"]
+    assert "Launch recap" in result["youtube_title"]
+    assert "ordered media upload" in result["youtube_description"]
     mock_grok_client.generate.assert_called_once()
     prompt = mock_grok_client.generate.call_args.args[0]
     assert state["strategy_angle"] in prompt
     assert "#buildinpublic" in prompt
+    assert RESEARCHED_STATE["youtube_url"] in prompt
+
+
+def test_generate_node_uses_cli_title_as_youtube_title_default(
+    mock_grok_client: MagicMock,
+) -> None:
+    from content_autopilot.graph.nodes import generate_node
+
+    state = {
+        **RESEARCHED_STATE,
+        "title": "CLI provided title",
+        "analysis_insights": "Key insight: developers want faster publishing workflows",
+        "strategy_angle": "builder journey",
+        "strategy_tone": "confident and practical",
+        "strategy_hashtags": ["#buildinpublic", "#devtools", "#automation"],
+    }
+
+    mock_grok_client.generate.return_value = GENERATE_GROK_RESPONSE
+
+    result = generate_node(state, grok_client=mock_grok_client)
+
+    assert result["youtube_title"] == "CLI provided title"
+    prompt = mock_grok_client.generate.call_args.args[0]
+    assert "CLI provided title" in prompt
 
 
 def test_build_content_autopilot_graph_chains_research_to_generate(
@@ -174,6 +207,8 @@ def test_graph_invoke_stores_analyze_strategy_generate_outputs(
         "media_fingerprints": RESEARCHED_STATE["media_fingerprints"],
         "github_url": RESEARCHED_STATE["github_url"],
         "tiktok_url": RESEARCHED_STATE["tiktok_url"],
+        "youtube_url": RESEARCHED_STATE["youtube_url"],
+        "title": "Launch recap title",
     }
 
     result = graph.invoke(initial_state)
@@ -185,4 +220,6 @@ def test_graph_invoke_stores_analyze_strategy_generate_outputs(
     assert result["strategy_hashtags"]
     assert result["x_post_text"]
     assert result["tiktok_proposal"]
+    assert result["youtube_title"] == "Launch recap title"
+    assert result["youtube_description"]
     assert mock_grok_client.generate.call_count >= 5

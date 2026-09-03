@@ -86,9 +86,12 @@ def test_save_post_metadata_persists_post_run(db_session: Session) -> None:
         media_fingerprints=SAMPLE_FINGERPRINTS,
         filenames=SAMPLE_FILENAMES,
         description="Launch recap",
+        title="Launch recap",
         github_url="https://github.com/example/repo",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         x_post_url="https://x.com/example/status/99",
+        youtube_url="https://www.youtube.com/watch?v=research-hint",
+        youtube_video_url="https://www.youtube.com/watch?v=published-id",
         tiktok_proposal='{"caption":"Try this workflow"}',
         created_at=created_at,
     )
@@ -99,11 +102,40 @@ def test_save_post_metadata_persists_post_run(db_session: Session) -> None:
     assert stored.media_fingerprints == SAMPLE_FINGERPRINTS
     assert stored.filenames == SAMPLE_FILENAMES
     assert stored.description == "Launch recap"
+    assert stored.title == "Launch recap"
     assert stored.github_url == "https://github.com/example/repo"
     assert stored.tiktok_url == "https://www.tiktok.com/@creator/video/1"
     assert stored.x_post_url == "https://x.com/example/status/99"
+    assert stored.youtube_url == "https://www.youtube.com/watch?v=research-hint"
+    assert stored.youtube_video_url == "https://www.youtube.com/watch?v=published-id"
     assert stored.tiktok_proposal == '{"caption":"Try this workflow"}'
     assert stored.created_at == created_at
+
+
+def test_save_post_metadata_allows_youtube_fields_to_be_null(
+    db_session: Session,
+) -> None:
+    from content_autopilot.db.models import PostRun
+    from content_autopilot.db.repository import PostRunRepository
+
+    repository = PostRunRepository(db_session)
+
+    saved = repository.save_post_metadata(
+        media_set_hash=SAMPLE_SET_HASH,
+        media_fingerprints=SAMPLE_FINGERPRINTS,
+        filenames=SAMPLE_FILENAMES,
+        description="Launch recap",
+        title=None,
+        youtube_url=None,
+        youtube_video_url=None,
+        created_at=datetime.now(tz=UTC),
+    )
+
+    stored = db_session.get(PostRun, saved.id)
+    assert stored is not None
+    assert stored.title is None
+    assert stored.youtube_url is None
+    assert stored.youtube_video_url is None
 
 
 def test_find_existing_by_media_set_returns_saved_run(db_session: Session) -> None:

@@ -29,6 +29,8 @@ GENERATED_STATE: dict[str, Any] = {
     "strategy_hashtags": ["#buildinpublic", "#devtools", "#automation"],
     "x_post_text": "Ship faster with our new CLI workflow.",
     "tiktok_proposal": "30s demo script showing ordered media upload and publish.",
+    "youtube_title": "Launch recap for our CLI workflow",
+    "youtube_description": "Watch how ordered media upload and publish works in practice.",
 }
 
 
@@ -82,6 +84,14 @@ def mock_apify_client() -> MagicMock:
     return client
 
 
+@pytest.fixture
+def mock_youtube_client() -> MagicMock:
+    client = MagicMock()
+    client.has_credentials.return_value = True
+    client.upload_video.return_value = "https://www.youtube.com/watch?v=published-video-id"
+    return client
+
+
 def test_content_autopilot_state_includes_validate_and_publish_fields() -> None:
     from content_autopilot.graph.state import ContentAutopilotState
 
@@ -91,6 +101,88 @@ def test_content_autopilot_state_includes_validate_and_publish_fields() -> None:
     assert "validation_errors" in annotations
     assert "x_post_url" in annotations
     assert "tiktok_proposal_structured" in annotations
+    assert "youtube_video_url" in annotations
+
+
+def test_publish_youtube_node_is_exported_from_graph_nodes() -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    assert hasattr(graph_nodes, "publish_youtube_node")
+
+
+def test_publish_youtube_node_uploads_first_video_when_valid(
+    settings,
+    mock_youtube_client: MagicMock,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    publish_youtube_node = graph_nodes.publish_youtube_node
+    validated_state = {
+        **GENERATED_STATE,
+        "validation_passed": True,
+        "validation_errors": [],
+        "tiktok_proposal_structured": {
+            "publish_mode": "proposal",
+            "caption": GENERATED_STATE["tiktok_proposal"],
+            "hashtags": GENERATED_STATE["strategy_hashtags"],
+            "media_order": GENERATED_STATE["media_paths"],
+        },
+    }
+
+    result = publish_youtube_node(
+        validated_state,
+        settings=settings,
+        youtube_client=mock_youtube_client,
+    )
+
+    mock_youtube_client.upload_video.assert_called_once()
+    call_kwargs = mock_youtube_client.upload_video.call_args.kwargs
+    assert call_kwargs["media_paths"] == GENERATED_STATE["media_paths"]
+    assert call_kwargs["title"] == GENERATED_STATE["youtube_title"]
+    assert result["youtube_video_url"] == "https://www.youtube.com/watch?v=published-video-id"
+
+
+def test_publish_youtube_node_skips_when_validation_failed(
+    settings,
+    mock_youtube_client: MagicMock,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    result = graph_nodes.publish_youtube_node(
+        {
+            **GENERATED_STATE,
+            "validation_passed": False,
+            "validation_errors": ["Length violation: X post exceeds 280 characters"],
+        },
+        settings=settings,
+        youtube_client=mock_youtube_client,
+    )
+
+    mock_youtube_client.upload_video.assert_not_called()
+    assert result.get("youtube_video_url") is None
+
+
+def test_publish_youtube_node_skips_without_credentials(
+    settings,
+    mock_youtube_client: MagicMock,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    mock_youtube_client.has_credentials.return_value = False
+    validated_state = {
+        **GENERATED_STATE,
+        "validation_passed": True,
+        "validation_errors": [],
+    }
+
+    result = graph_nodes.publish_youtube_node(
+        validated_state,
+        settings=settings,
+        youtube_client=mock_youtube_client,
+    )
+
+    mock_youtube_client.upload_video.assert_not_called()
+    assert result.get("youtube_video_url") is None
 
 
 def test_validate_node_passes_valid_generated_content() -> None:
@@ -251,6 +343,33 @@ def test_tiktok_proposal_node_uses_apify_mock_when_configured(
     mock_apify_client.research_urls.assert_not_called()
 
 
+def test_publish_x_node_skips_when_validation_failed(
+    settings,
+    mock_x_publish_client: MagicMock,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    result = graph_nodes.publish_x_node(
+        {
+            **GENERATED_STATE,
+            "validation_passed": False,
+            "validation_errors": ["Length violation: X post exceeds 280 characters"],
+        },
+        settings=settings,
+        x_client=mock_x_publish_client,
+    )
+
+    mock_x_publish_client.publish_post.assert_not_called()
+    assert result["x_post_url"] is None
+
+
+def test_route_after_validate_skips_publish_on_failure() -> None:
+    from content_autopilot.graph.workflow import route_after_validate
+
+    assert route_after_validate({"validation_passed": True}) == "publish_x"
+    assert route_after_validate({"validation_passed": False}) == "tiktok_proposal"
+
+
 def test_build_content_autopilot_graph_wires_generate_through_publish(settings) -> None:
     from content_autopilot.graph.workflow import build_content_autopilot_graph
 
@@ -262,11 +381,30 @@ def test_build_content_autopilot_graph_wires_generate_through_publish(settings) 
     assert "validate" in node_names
     assert "publish_x" in node_names
     assert "tiktok_proposal" in node_names
+    assert "publish_youtube" in node_names
     assert ("generate", "validate") in edges
-    assert ("validate", "publish_x") in edges
+    assert ("validate", "publish_x") in edges or any(
+        edge.source == "validate" and edge.target == "publish_x" for edge in compiled.edges
+    )
     assert ("publish_x", "tiktok_proposal") in edges
-    assert ("tiktok_proposal", "__end__") in edges
+    assert ("tiktok_proposal", "publish_youtube") in edges
+    assert ("publish_youtube", "__end__") in edges
+    assert ("tiktok_proposal", "__end__") not in edges
     assert ("generate", "__end__") not in edges
+
+
+def test_build_content_autopilot_graph_accepts_injected_youtube_client(
+    settings,
+    mock_youtube_client: MagicMock,
+) -> None:
+    from content_autopilot.graph.workflow import build_content_autopilot_graph
+
+    graph = build_content_autopilot_graph(
+        settings,
+        youtube_client=mock_youtube_client,
+    )
+
+    assert "publish_youtube" in set(graph.get_graph().nodes.keys())
 
 
 def test_graph_invoke_preserves_media_paths_through_publish_flow(
@@ -287,15 +425,24 @@ def test_graph_invoke_preserves_media_paths_through_publish_flow(
         ),
         (
             "X post: Ship faster with our new CLI workflow.\n"
-            "TikTok proposal: 30s demo script showing ordered media upload and publish."
+            "TikTok proposal: 30s demo script showing ordered media upload and publish.\n"
+            "YouTube title: Launch recap for our CLI workflow\n"
+            "YouTube description: Watch how ordered media upload and publish works in practice."
         ),
     ]
+
+    mock_youtube = MagicMock()
+    mock_youtube.has_credentials.return_value = True
+    mock_youtube.upload_video.return_value = (
+        "https://www.youtube.com/watch?v=published-video-id"
+    )
 
     graph = build_content_autopilot_graph(
         settings,
         grok_client=mock_grok_client,
         x_client=mock_x_publish_client,
         apify_client=MagicMock(research_urls=lambda urls: None),
+        youtube_client=mock_youtube,
     )
 
     initial_state = {
@@ -313,4 +460,6 @@ def test_graph_invoke_preserves_media_paths_through_publish_flow(
     assert result["validation_passed"] is True
     assert result["x_post_url"] == "https://x.com/example/status/123456789"
     assert result["tiktok_proposal_structured"]["media_order"] == GENERATED_STATE["media_paths"]
+    assert result["youtube_video_url"] == "https://www.youtube.com/watch?v=published-video-id"
     mock_x_publish_client.publish_post.assert_called_once()
+    mock_youtube.upload_video.assert_called_once()

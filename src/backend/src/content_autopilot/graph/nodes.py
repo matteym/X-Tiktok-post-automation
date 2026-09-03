@@ -5,12 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from content_autopilot.graph.clients import (
-    ApifyClient,
-    GrokClient,
-    XClient,
-    _has_tiktok_credentials,
-)
+from content_autopilot.graph.clients import TikTokClient, _has_tiktok_credentials
 from content_autopilot.graph.state import ContentAutopilotState
 from content_autopilot.settings import Settings
 
@@ -35,6 +30,12 @@ class ApifyClientProtocol(Protocol):
     def research_urls(self, urls: list[str]) -> str | None: ...
 
 
+class YouTubeClientProtocol(Protocol):
+    def has_credentials(self) -> bool: ...
+
+    def upload_video(self, *, media_paths: Sequence[str], title: str) -> str: ...
+
+
 def infer_media_type(filename: str) -> str:
     suffix = Path(filename).suffix.lower()
     if suffix in VIDEO_EXTENSIONS:
@@ -56,6 +57,7 @@ def understand_node(
     description = state.get("description", "")
     github_url = state.get("github_url")
     tiktok_url = state.get("tiktok_url")
+    youtube_url = state.get("youtube_url")
 
     prompt_parts = [
         "Understand this content-autopilot post request.",
@@ -67,6 +69,8 @@ def understand_node(
         prompt_parts.append(f"GitHub hint: {github_url}")
     if tiktok_url:
         prompt_parts.append(f"TikTok hint: {tiktok_url}")
+    if youtube_url:
+        prompt_parts.append(f"YouTube hint: {youtube_url}")
 
     grok_summary = grok_client.generate("\n".join(prompt_parts))
     summary_parts = [
@@ -77,6 +81,8 @@ def understand_node(
         summary_parts.append(f"GitHub hint: {github_url}")
     if tiktok_url:
         summary_parts.append(f"TikTok hint: {tiktok_url}")
+    if youtube_url:
+        summary_parts.append(f"YouTube hint: {youtube_url}")
 
     return {
         "media_count": media_count,
@@ -99,10 +105,13 @@ def research_node(
     research_urls: list[str] = []
     github_url = state.get("github_url")
     tiktok_url = state.get("tiktok_url")
+    youtube_url = state.get("youtube_url")
     if github_url:
         research_urls.append(github_url)
     if tiktok_url:
         research_urls.append(tiktok_url)
+    if youtube_url:
+        research_urls.append(youtube_url)
 
     web_research: str | None = None
     if settings.apify_api_token and research_urls:
@@ -141,16 +150,22 @@ def _parse_strategy_response(text: str) -> tuple[str, str, list[str]]:
     return angle, tone, hashtags
 
 
-def _parse_generate_response(text: str) -> tuple[str, str]:
+def _parse_generate_response(text: str) -> tuple[str, str, str, str]:
     x_post_text = text.strip()
     tiktok_proposal = text.strip()
+    youtube_title = ""
+    youtube_description = ""
     for line in text.splitlines():
         lowered = line.lower()
         if lowered.startswith("x post:"):
             x_post_text = line.strip()
         elif lowered.startswith("tiktok proposal:"):
             tiktok_proposal = line.strip()
-    return x_post_text, tiktok_proposal
+        elif lowered.startswith("youtube title:"):
+            youtube_title = line.split(":", 1)[1].strip()
+        elif lowered.startswith("youtube description:"):
+            youtube_description = line.split(":", 1)[1].strip()
+    return x_post_text, tiktok_proposal, youtube_title, youtube_description
 
 
 def analyze_node(
@@ -200,23 +215,35 @@ def generate_node(
     *,
     grok_client: GrokClientProtocol,
 ) -> ContentAutopilotState:
-    """Draft the X post text and TikTok proposal caption/script."""
+    """Draft the X post text, TikTok proposal, and YouTube snippet metadata."""
     hashtags = state.get("strategy_hashtags", [])
-    prompt = "\n".join(
-        [
-            "Generate draft content for X and TikTok.",
-            f"Description: {state.get('description', '')}",
-            f"Strategy angle: {state.get('strategy_angle', '')}",
-            f"Strategy tone: {state.get('strategy_tone', '')}",
-            f"Strategy hashtags: {' '.join(hashtags)}",
-            "Return X post and TikTok proposal on separate lines.",
-        ]
+    cli_title = state.get("title")
+    youtube_url = state.get("youtube_url")
+    prompt_parts = [
+        "Generate draft content for X, TikTok, and YouTube.",
+        f"Description: {state.get('description', '')}",
+        f"Strategy angle: {state.get('strategy_angle', '')}",
+        f"Strategy tone: {state.get('strategy_tone', '')}",
+        f"Strategy hashtags: {' '.join(hashtags)}",
+    ]
+    if youtube_url:
+        prompt_parts.append(f"YouTube hint: {youtube_url}")
+    if cli_title:
+        prompt_parts.append(f"Default YouTube title: {cli_title}")
+    prompt_parts.append(
+        "Return X post, TikTok proposal, YouTube title, and YouTube description on separate lines."
     )
-    generated = grok_client.generate(prompt)
-    x_post_text, tiktok_proposal = _parse_generate_response(generated)
+    generated = grok_client.generate("\n".join(prompt_parts))
+    x_post_text, tiktok_proposal, youtube_title, youtube_description = (
+        _parse_generate_response(generated)
+    )
+    if cli_title:
+        youtube_title = cli_title
     return {
         "x_post_text": x_post_text,
         "tiktok_proposal": tiktok_proposal,
+        "youtube_title": youtube_title,
+        "youtube_description": youtube_description,
     }
 
 
@@ -264,6 +291,10 @@ def publish_x_node(
     media_paths = _resolved_media_paths(state)
     result: ContentAutopilotState = {"media_paths": media_paths}
 
+    if not state.get("validation_passed", False):
+        result["x_post_url"] = None
+        return result
+
     if not x_client.has_credentials():
         result["x_post_url"] = None
         return result
@@ -280,16 +311,21 @@ def tiktok_proposal_node(
     *,
     settings: Settings,
     apify_client: ApifyClientProtocol | None = None,
+    tiktok_client: TikTokClient | None = None,
 ) -> ContentAutopilotState:
-    """Build a structured TikTok proposal without live publish unless configured."""
+    """Build a structured TikTok proposal, and live-upload when configured and valid."""
     _ = apify_client
     media_paths = _resolved_media_paths(state)
     caption = state.get("tiktok_proposal", "") or state.get("description", "")
     hashtags = state.get("strategy_hashtags", [])
 
     publish_mode = "proposal"
-    if _has_tiktok_credentials(settings):
-        publish_mode = "live" if settings.tiktok_access_token else "proposal"
+    publish_id: str | None = None
+    if state.get("validation_passed") and _has_tiktok_credentials(settings):
+        client = tiktok_client or TikTokClient(settings)
+        publish_id = client.publish_video(media_paths=media_paths, caption=caption)
+        if publish_id:
+            publish_mode = "live"
 
     structured: dict[str, str | list[str]] = {
         "publish_mode": publish_mode,
@@ -297,8 +333,41 @@ def tiktok_proposal_node(
         "hashtags": hashtags,
         "media_order": media_paths,
     }
+    if publish_id:
+        structured["publish_id"] = publish_id
 
     return {
         "media_paths": media_paths,
         "tiktok_proposal_structured": structured,
     }
+
+
+def publish_youtube_node(
+    state: ContentAutopilotState,
+    *,
+    settings: Settings,
+    youtube_client: YouTubeClientProtocol,
+) -> ContentAutopilotState:
+    """Upload the first video to YouTube when validation passed and OAuth is configured."""
+    _ = settings
+    media_paths = _resolved_media_paths(state)
+    result: ContentAutopilotState = {"media_paths": media_paths}
+
+    if not state.get("validation_passed", False):
+        result["youtube_video_url"] = None
+        return result
+
+    if not youtube_client.has_credentials():
+        result["youtube_video_url"] = None
+        return result
+
+    title = (
+        state.get("youtube_title")
+        or state.get("title")
+        or state.get("description", "")
+    )
+    result["youtube_video_url"] = youtube_client.upload_video(
+        media_paths=media_paths,
+        title=title,
+    )
+    return result

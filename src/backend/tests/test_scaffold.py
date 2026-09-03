@@ -23,6 +23,11 @@ REQUIRED_DEPENDENCIES = (
     "python-dotenv",
 )
 
+YOUTUBE_DEPENDENCIES = (
+    "google-api-python-client",
+    "google-auth-oauthlib",
+)
+
 DB_DEPENDENCY_OPTIONS = ("psycopg", "asyncpg", "sqlalchemy")
 
 
@@ -50,6 +55,14 @@ def test_pyproject_lists_required_dependencies() -> None:
     assert any(option in deps_blob for option in DB_DEPENDENCY_OPTIONS), (
         "expected one of psycopg, asyncpg, or sqlalchemy in dependencies"
     )
+
+
+def test_pyproject_lists_youtube_oauth_dependencies() -> None:
+    project = _load_pyproject()["project"]
+    deps_blob = " ".join(project.get("dependencies", [])).lower()
+
+    for dep in YOUTUBE_DEPENDENCIES:
+        assert dep in deps_blob, f"missing YouTube dependency: {dep}"
 
 
 def test_pyproject_has_build_system_and_src_layout() -> None:

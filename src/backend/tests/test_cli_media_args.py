@@ -13,6 +13,8 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent
 CLI_MODULE = BACKEND_ROOT / "src" / "content_autopilot" / "cli.py"
 RUN_INPUTS_MODULE = BACKEND_ROOT / "src" / "content_autopilot" / "media" / "run_inputs.py"
 
+TITLE_MAX_LENGTH = 100
+
 runner = CliRunner()
 
 
@@ -95,6 +97,53 @@ def test_collect_run_media_accepts_optional_urls(
 
     assert collected.github_url == "https://github.com/example/repo"
     assert collected.tiktok_url == "https://www.tiktok.com/@creator/video/1"
+
+
+def test_collect_run_media_accepts_title_and_youtube_url(
+    media_files: tuple[Path, Path, Path],
+) -> None:
+    from content_autopilot.media.run_inputs import collect_run_media
+
+    first, _, _ = media_files
+    collected = collect_run_media(
+        video_paths=[first],
+        description="Launch recap with research context",
+        title="Launch recap",
+        youtube_url="https://www.youtube.com/watch?v=research-hint",
+    )
+
+    assert collected.title == "Launch recap"
+    assert collected.youtube_url == "https://www.youtube.com/watch?v=research-hint"
+
+
+def test_collect_run_media_derives_title_from_truncated_description(
+    media_files: tuple[Path, Path, Path],
+) -> None:
+    from content_autopilot.media.run_inputs import collect_run_media
+
+    first, _, _ = media_files
+    long_description = "x" * (TITLE_MAX_LENGTH + 25)
+    collected = collect_run_media(
+        video_paths=[first],
+        description=long_description,
+    )
+
+    assert collected.title == long_description[:TITLE_MAX_LENGTH]
+    assert len(collected.title) == TITLE_MAX_LENGTH
+
+
+def test_collect_run_media_uses_full_description_as_title_when_short(
+    media_files: tuple[Path, Path, Path],
+) -> None:
+    from content_autopilot.media.run_inputs import collect_run_media
+
+    first, _, _ = media_files
+    collected = collect_run_media(
+        video_paths=[first],
+        description="Short launch recap",
+    )
+
+    assert collected.title == "Short launch recap"
 
 
 def test_collect_run_media_rejects_missing_video_path(tmp_path: Path) -> None:
@@ -206,3 +255,93 @@ def test_cli_run_accepts_multiple_videos_and_optional_urls(
         assert fingerprint in result.stdout
     assert _expected_set_hash(expected_fingerprints) in result.stdout
     assert "Launch recap" in result.stdout
+
+
+def test_cli_run_accepts_title_and_youtube_and_threads_graph_state(
+    media_files: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.cli import app
+
+    first, _, _ = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        "x_post_url": "https://x.com/example/status/123456789",
+        "tiktok_proposal": "Launch recap proposal",
+        "tiktok_proposal_structured": {
+            "publish_mode": "proposal",
+            "caption": "Launch recap proposal",
+            "hashtags": ["#launch"],
+            "media_order": [str(first)],
+        },
+        "youtube_video_url": "https://www.youtube.com/watch?v=published-from-cli",
+        "validation_passed": True,
+    }
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setenv("GROK_API_KEY", "test-grok-api-key")
+    monkeypatch.setattr(
+        "content_autopilot.orchestration.build_content_autopilot_graph",
+        lambda _settings, **kwargs: mock_graph,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--description",
+            "Launch recap with YouTube context",
+            "--video",
+            str(first),
+            "--title",
+            "Launch recap",
+            "--youtube",
+            "https://www.youtube.com/watch?v=research-hint",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr or result.stdout
+    mock_graph.invoke.assert_called_once()
+    initial_state = mock_graph.invoke.call_args.args[0]
+    assert initial_state["title"] == "Launch recap"
+    assert initial_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
+    assert "YouTube" in result.stdout
+    assert "https://www.youtube.com/watch?v=published-from-cli" in result.stdout
+
+
+def test_cli_run_derives_title_from_description_when_omitted(
+    media_files: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.cli import app
+
+    first, _, _ = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        "x_post_url": "https://x.com/example/status/123456789",
+        "validation_passed": True,
+    }
+    long_description = "y" * (TITLE_MAX_LENGTH + 10)
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setenv("GROK_API_KEY", "test-grok-api-key")
+    monkeypatch.setattr(
+        "content_autopilot.orchestration.build_content_autopilot_graph",
+        lambda _settings, **kwargs: mock_graph,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--description",
+            long_description,
+            "--video",
+            str(first),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr or result.stdout
+    initial_state = mock_graph.invoke.call_args.args[0]
+    assert initial_state["title"] == long_description[:TITLE_MAX_LENGTH]
+    assert initial_state.get("youtube_url") is None

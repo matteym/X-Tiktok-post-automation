@@ -18,9 +18,12 @@ REQUIRED_POST_RUN_COLUMNS = {
     "media_fingerprints",
     "filenames",
     "description",
+    "title",
     "github_url",
     "tiktok_url",
     "x_post_url",
+    "youtube_url",
+    "youtube_video_url",
     "tiktok_proposal",
     "created_at",
 }
@@ -82,9 +85,12 @@ def test_persist_post_run_with_ordered_media_metadata(db_session: Session) -> No
         media_fingerprints=["deadbeef:1024", "cafebabe:2048"],
         filenames=["clip.mp4", "cover.jpg"],
         description="Launch day recap",
+        title="Launch day recap",
         github_url="https://github.com/example/repo",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         x_post_url="https://x.com/example/status/99",
+        youtube_url="https://www.youtube.com/watch?v=research-hint",
+        youtube_video_url="https://www.youtube.com/watch?v=published-id",
         tiktok_proposal='{"caption":"Try this workflow","hashtags":["#buildinpublic"]}',
         created_at=created_at,
     )
@@ -96,9 +102,12 @@ def test_persist_post_run_with_ordered_media_metadata(db_session: Session) -> No
     assert stored.media_fingerprints == ["deadbeef:1024", "cafebabe:2048"]
     assert stored.filenames == ["clip.mp4", "cover.jpg"]
     assert stored.description == "Launch day recap"
+    assert stored.title == "Launch day recap"
     assert stored.github_url == "https://github.com/example/repo"
     assert stored.tiktok_url == "https://www.tiktok.com/@creator/video/1"
     assert stored.x_post_url == "https://x.com/example/status/99"
+    assert stored.youtube_url == "https://www.youtube.com/watch?v=research-hint"
+    assert stored.youtube_video_url == "https://www.youtube.com/watch?v=published-id"
     assert "caption" in stored.tiktok_proposal
     assert stored.created_at == created_at
 
@@ -111,9 +120,12 @@ def test_persist_post_run_allows_optional_urls_to_be_null(db_session: Session) -
         media_fingerprints=["abc123:512"],
         filenames=["photo.png"],
         description="Minimal run",
+        title=None,
         github_url=None,
         tiktok_url=None,
         x_post_url=None,
+        youtube_url=None,
+        youtube_video_url=None,
         tiktok_proposal=None,
         created_at=datetime.now(tz=UTC),
     )
@@ -121,7 +133,10 @@ def test_persist_post_run_allows_optional_urls_to_be_null(db_session: Session) -
     db_session.commit()
 
     stored = db_session.query(PostRun).filter_by(media_set_hash="set-hash-minimal").one()
+    assert stored.title is None
     assert stored.github_url is None
     assert stored.tiktok_url is None
     assert stored.x_post_url is None
+    assert stored.youtube_url is None
+    assert stored.youtube_video_url is None
     assert stored.tiktok_proposal is None

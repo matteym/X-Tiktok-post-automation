@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from langgraph.graph import END, START, StateGraph
 
-from content_autopilot.graph.clients import ApifyClient, GrokClient, XClient
+from content_autopilot.graph.clients import (
+    ApifyClient,
+    GrokClient,
+    TikTokClient,
+    XClient,
+    YouTubeClient,
+)
 from content_autopilot.graph.nodes import (
     analyze_node,
     generate_node,
     publish_x_node,
+    publish_youtube_node,
     research_node,
     strategy_node,
     tiktok_proposal_node,
@@ -17,6 +24,13 @@ from content_autopilot.graph.nodes import (
 )
 from content_autopilot.graph.state import ContentAutopilotState
 from content_autopilot.settings import Settings
+
+
+def route_after_validate(state: ContentAutopilotState) -> str:
+    """Skip live X publish when validation failed."""
+    if state.get("validation_passed"):
+        return "publish_x"
+    return "tiktok_proposal"
 
 
 def build_understand_research_graph(
@@ -58,11 +72,15 @@ def build_content_autopilot_graph(
     grok_client: GrokClient | None = None,
     x_client: XClient | None = None,
     apify_client: ApifyClient | None = None,
+    tiktok_client: TikTokClient | None = None,
+    youtube_client: YouTubeClient | None = None,
 ):
-    """Build START -> understand -> research -> analyze -> strategy -> generate -> validate -> publish_x -> tiktok_proposal."""
+    """Build START -> understand -> research -> analyze -> strategy -> generate -> validate -> publish_x -> tiktok_proposal -> publish_youtube."""
     grok = grok_client or GrokClient(settings)
     x = x_client or XClient(settings)
     apify = apify_client or ApifyClient(settings)
+    tiktok = tiktok_client or TikTokClient(settings)
+    youtube = youtube_client or YouTubeClient(settings)
 
     def understand(state: ContentAutopilotState) -> ContentAutopilotState:
         return understand_node(state, grok_client=grok)
@@ -96,6 +114,14 @@ def build_content_autopilot_graph(
             state,
             settings=settings,
             apify_client=apify,
+            tiktok_client=tiktok,
+        )
+
+    def publish_youtube(state: ContentAutopilotState) -> ContentAutopilotState:
+        return publish_youtube_node(
+            state,
+            settings=settings,
+            youtube_client=youtube,
         )
 
     graph = StateGraph(ContentAutopilotState)
@@ -107,13 +133,19 @@ def build_content_autopilot_graph(
     graph.add_node("validate", validate)
     graph.add_node("publish_x", publish_x)
     graph.add_node("tiktok_proposal", tiktok_proposal)
+    graph.add_node("publish_youtube", publish_youtube)
     graph.add_edge(START, "understand")
     graph.add_edge("understand", "research")
     graph.add_edge("research", "analyze")
     graph.add_edge("analyze", "strategy")
     graph.add_edge("strategy", "generate")
     graph.add_edge("generate", "validate")
-    graph.add_edge("validate", "publish_x")
+    graph.add_conditional_edges(
+        "validate",
+        route_after_validate,
+        {"publish_x": "publish_x", "tiktok_proposal": "tiktok_proposal"},
+    )
     graph.add_edge("publish_x", "tiktok_proposal")
-    graph.add_edge("tiktok_proposal", END)
+    graph.add_edge("tiktok_proposal", "publish_youtube")
+    graph.add_edge("publish_youtube", END)
     return graph.compile()
