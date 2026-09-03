@@ -274,6 +274,7 @@ def test_cli_run_accepts_title_and_youtube_and_threads_graph_state(
             "hashtags": ["#launch"],
             "media_order": [str(first)],
         },
+        "youtube_video_url": "https://www.youtube.com/watch?v=published-from-cli",
         "validation_passed": True,
     }
 
@@ -304,6 +305,8 @@ def test_cli_run_accepts_title_and_youtube_and_threads_graph_state(
     initial_state = mock_graph.invoke.call_args.args[0]
     assert initial_state["title"] == "Launch recap"
     assert initial_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
+    assert "YouTube" in result.stdout
+    assert "https://www.youtube.com/watch?v=published-from-cli" in result.stdout
 
 
 def test_cli_run_derives_title_from_description_when_omitted(

@@ -28,7 +28,10 @@ PROGRESS_STEPS = (
     "Validate",
     "Publish",
     "TikTok",
+    "YouTube",
 )
+
+MOCK_YOUTUBE_WATCH_URL = "https://www.youtube.com/watch?v=published-video-id"
 
 MOCK_GRAPH_RESULT: dict[str, Any] = {
     "x_post_url": "https://x.com/example/status/123456789",
@@ -39,6 +42,7 @@ MOCK_GRAPH_RESULT: dict[str, Any] = {
         "hashtags": ["#buildinpublic", "#devtools"],
         "media_order": [],
     },
+    "youtube_video_url": MOCK_YOUTUBE_WATCH_URL,
     "validation_passed": True,
 }
 
@@ -126,6 +130,27 @@ def test_cli_run_wires_orchestration_module() -> None:
     assert "orchestration" in source
 
 
+def test_pipeline_steps_include_youtube() -> None:
+    import content_autopilot.orchestration as orchestration
+
+    assert "YouTube" in orchestration.PIPELINE_STEPS
+
+
+def test_default_confirm_defaults_to_no(monkeypatch: pytest.MonkeyPatch) -> None:
+    import content_autopilot.orchestration as orchestration
+
+    prompts: list[tuple[str, str]] = []
+
+    def _record_prompt(message: str, default: str = "n") -> str:
+        prompts.append((message, default))
+        return ""
+
+    monkeypatch.setattr("content_autopilot.orchestration.typer.prompt", _record_prompt)
+
+    assert orchestration.default_confirm("Proceed with posting this media set again?") is False
+    assert prompts == [("Proceed with posting this media set again? [y/N]", "n")]
+
+
 def test_execute_run_invokes_full_langgraph_dag(
     media_files: tuple[Path, Path],
     settings,
@@ -143,6 +168,10 @@ def test_execute_run_invokes_full_langgraph_dag(
     exit_code = execute_run(
         video_paths=[first, second],
         description="Launch recap",
+        github_url="https://github.com/example/repo",
+        tiktok_url="https://www.tiktok.com/@creator/video/1",
+        title="Launch recap title",
+        youtube_url="https://www.youtube.com/watch?v=research-hint",
         settings=settings,
         repository=repository,
         graph=mock_compiled_graph,
@@ -155,6 +184,10 @@ def test_execute_run_invokes_full_langgraph_dag(
     invoked_state = mock_compiled_graph.invoke.call_args.args[0]
     assert invoked_state["media_paths"] == [str(first), str(second)]
     assert invoked_state["description"] == "Launch recap"
+    assert invoked_state["title"] == "Launch recap title"
+    assert invoked_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
+    assert invoked_state["github_url"] == "https://github.com/example/repo"
+    assert invoked_state["tiktok_url"] == "https://www.tiktok.com/@creator/video/1"
 
 
 def test_execute_run_persists_metadata_after_success(
@@ -177,6 +210,10 @@ def test_execute_run_persists_metadata_after_success(
     exit_code = execute_run(
         video_paths=[first, second],
         description="Launch recap",
+        github_url="https://github.com/example/repo",
+        tiktok_url="https://www.tiktok.com/@creator/video/1",
+        title="Launch recap title",
+        youtube_url="https://www.youtube.com/watch?v=research-hint",
         settings=settings,
         repository=repository,
         graph=mock_compiled_graph,
@@ -188,8 +225,15 @@ def test_execute_run_persists_metadata_after_success(
     stored = db_session.scalars(select(PostRun)).all()
     assert len(stored) == 1
     assert stored[0].media_fingerprints == fingerprints
-    assert stored[0].x_post_url == MOCK_GRAPH_RESULT["x_post_url"]
+    assert stored[0].filenames == [first.name, second.name]
     assert stored[0].description == "Launch recap"
+    assert stored[0].title == "Launch recap title"
+    assert stored[0].github_url == "https://github.com/example/repo"
+    assert stored[0].tiktok_url == "https://www.tiktok.com/@creator/video/1"
+    assert stored[0].youtube_url == "https://www.youtube.com/watch?v=research-hint"
+    assert stored[0].x_post_url == MOCK_GRAPH_RESULT["x_post_url"]
+    assert stored[0].youtube_video_url == MOCK_YOUTUBE_WATCH_URL
+    assert stored[0].tiktok_proposal is not None
 
 
 def test_execute_run_emits_progress_steps_and_final_summary(
@@ -218,7 +262,43 @@ def test_execute_run_emits_progress_steps_and_final_summary(
     for step in PROGRESS_STEPS:
         assert step in combined
     assert MOCK_GRAPH_RESULT["x_post_url"] in combined
+    assert MOCK_YOUTUBE_WATCH_URL in combined
     assert "TikTok proposal" in combined or "TikTok" in combined
+
+
+def test_execute_run_prints_none_when_youtube_upload_skipped(
+    media_files: tuple[Path, Path],
+    settings,
+    repository,
+) -> None:
+    import content_autopilot.orchestration as orchestration
+
+    execute_run = orchestration.execute_run
+    first, second = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        **MOCK_GRAPH_RESULT,
+        "youtube_video_url": None,
+        "tiktok_proposal_structured": {
+            **MOCK_GRAPH_RESULT["tiktok_proposal_structured"],
+            "media_order": [str(first), str(second)],
+        },
+    }
+    output: list[str] = []
+
+    execute_run(
+        video_paths=[first, second],
+        description="Launch recap",
+        settings=settings,
+        repository=repository,
+        graph=mock_graph,
+        confirm=lambda _: True,
+        echo=output.append,
+    )
+
+    combined = "\n".join(output)
+    assert "YouTube" in combined
+    assert "none" in combined.lower()
 
 
 def test_execute_run_warns_on_duplicate_media_set(
@@ -242,6 +322,7 @@ def test_execute_run_warns_on_duplicate_media_set(
         filenames=[first.name, second.name],
         description="Prior launch recap",
         x_post_url="https://x.com/example/status/prior",
+        youtube_video_url="https://www.youtube.com/watch?v=prior-video",
         created_at=datetime(2026, 8, 30, 12, 0, tzinfo=UTC),
     )
 
@@ -260,6 +341,7 @@ def test_execute_run_warns_on_duplicate_media_set(
     assert DUPLICATE_WARNING in combined
     assert "Prior launch recap" in combined
     assert "https://x.com/example/status/prior" in combined
+    assert "https://www.youtube.com/watch?v=prior-video" in combined
 
 
 def test_execute_run_aborts_duplicate_when_confirmation_declined(
@@ -391,4 +473,60 @@ def test_cli_run_end_to_end_with_mocked_graph(
     assert result.exit_code == 0, result.stderr or result.stdout
     mock_graph.invoke.assert_called_once()
     assert MOCK_GRAPH_RESULT["x_post_url"] in result.stdout
+    assert MOCK_YOUTUBE_WATCH_URL in result.stdout
     assert any(step in result.stdout for step in PROGRESS_STEPS)
+
+
+def test_cli_run_end_to_end_prints_none_when_youtube_upload_skipped(
+    media_files: tuple[Path, Path],
+    settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.cli import app
+
+    first, second = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        **MOCK_GRAPH_RESULT,
+        "youtube_video_url": None,
+        "tiktok_proposal_structured": {
+            **MOCK_GRAPH_RESULT["tiktok_proposal_structured"],
+            "media_order": [str(first), str(second)],
+        },
+    }
+
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    monkeypatch.setenv("GROK_API_KEY", settings.grok_api_key)
+
+    def _build_graph(_settings, **kwargs):
+        del _settings, kwargs
+        return mock_graph
+
+    monkeypatch.setattr(
+        "content_autopilot.orchestration.build_content_autopilot_graph",
+        _build_graph,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--description",
+            "Launch recap",
+            "--video",
+            str(first),
+            "--video",
+            str(second),
+            "--title",
+            "Launch recap title",
+            "--youtube",
+            "https://www.youtube.com/watch?v=research-hint",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr or result.stdout
+    assert "YouTube" in result.stdout
+    assert "none" in result.stdout.lower()
+    initial_state = mock_graph.invoke.call_args.args[0]
+    assert initial_state["title"] == "Launch recap title"
+    assert initial_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"

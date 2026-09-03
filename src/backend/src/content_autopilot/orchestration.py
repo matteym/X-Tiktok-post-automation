@@ -26,6 +26,7 @@ PIPELINE_STEPS = (
     "Validate",
     "Publish",
     "TikTok",
+    "YouTube",
 )
 
 
@@ -41,6 +42,7 @@ def _format_duplicate_warning(existing: PostRun) -> str:
             DUPLICATE_WARNING,
             f"description: {existing.description}",
             f"x_post_url: {existing.x_post_url or 'none'}",
+            f"youtube_video_url: {existing.youtube_video_url or 'none'}",
             f"created_at: {existing.created_at.isoformat()}",
         )
     )
@@ -132,6 +134,8 @@ def execute_run(
     write(f"X post URL: {x_post_url or 'none'}")
     structured = result.get("tiktok_proposal_structured") or {}
     write(_format_tiktok_summary(structured))
+    youtube_video_url = result.get("youtube_video_url")
+    write(f"YouTube watch URL: {youtube_video_url or 'none'}")
 
     tiktok_proposal_value: str | None
     if structured:
@@ -144,9 +148,12 @@ def execute_run(
         media_fingerprints=collected.media_fingerprints,
         filenames=collected.filenames,
         description=collected.description,
+        title=collected.title,
         github_url=collected.github_url,
         tiktok_url=collected.tiktok_url,
+        youtube_url=collected.youtube_url,
         x_post_url=x_post_url,
+        youtube_video_url=youtube_video_url,
         tiktok_proposal=tiktok_proposal_value,
     )
 
