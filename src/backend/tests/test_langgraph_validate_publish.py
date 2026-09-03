@@ -251,6 +251,33 @@ def test_tiktok_proposal_node_uses_apify_mock_when_configured(
     mock_apify_client.research_urls.assert_not_called()
 
 
+def test_publish_x_node_skips_when_validation_failed(
+    settings,
+    mock_x_publish_client: MagicMock,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    result = graph_nodes.publish_x_node(
+        {
+            **GENERATED_STATE,
+            "validation_passed": False,
+            "validation_errors": ["Length violation: X post exceeds 280 characters"],
+        },
+        settings=settings,
+        x_client=mock_x_publish_client,
+    )
+
+    mock_x_publish_client.publish_post.assert_not_called()
+    assert result["x_post_url"] is None
+
+
+def test_route_after_validate_skips_publish_on_failure() -> None:
+    from content_autopilot.graph.workflow import route_after_validate
+
+    assert route_after_validate({"validation_passed": True}) == "publish_x"
+    assert route_after_validate({"validation_passed": False}) == "tiktok_proposal"
+
+
 def test_build_content_autopilot_graph_wires_generate_through_publish(settings) -> None:
     from content_autopilot.graph.workflow import build_content_autopilot_graph
 
@@ -263,7 +290,9 @@ def test_build_content_autopilot_graph_wires_generate_through_publish(settings) 
     assert "publish_x" in node_names
     assert "tiktok_proposal" in node_names
     assert ("generate", "validate") in edges
-    assert ("validate", "publish_x") in edges
+    assert ("validate", "publish_x") in edges or any(
+        edge.source == "validate" and edge.target == "publish_x" for edge in compiled.edges
+    )
     assert ("publish_x", "tiktok_proposal") in edges
     assert ("tiktok_proposal", "__end__") in edges
     assert ("generate", "__end__") not in edges

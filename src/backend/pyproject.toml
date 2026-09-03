@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings",
     "typer",
     "sqlalchemy",
+    "psycopg[binary]",
     "httpx",
     "python-dotenv",
 ]

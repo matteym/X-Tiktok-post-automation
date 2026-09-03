@@ -5,12 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from content_autopilot.graph.clients import (
-    ApifyClient,
-    GrokClient,
-    XClient,
-    _has_tiktok_credentials,
-)
+from content_autopilot.graph.clients import TikTokClient, _has_tiktok_credentials
 from content_autopilot.graph.state import ContentAutopilotState
 from content_autopilot.settings import Settings
 
@@ -264,6 +259,10 @@ def publish_x_node(
     media_paths = _resolved_media_paths(state)
     result: ContentAutopilotState = {"media_paths": media_paths}
 
+    if not state.get("validation_passed", False):
+        result["x_post_url"] = None
+        return result
+
     if not x_client.has_credentials():
         result["x_post_url"] = None
         return result
@@ -280,16 +279,21 @@ def tiktok_proposal_node(
     *,
     settings: Settings,
     apify_client: ApifyClientProtocol | None = None,
+    tiktok_client: TikTokClient | None = None,
 ) -> ContentAutopilotState:
-    """Build a structured TikTok proposal without live publish unless configured."""
+    """Build a structured TikTok proposal, and live-upload when configured and valid."""
     _ = apify_client
     media_paths = _resolved_media_paths(state)
     caption = state.get("tiktok_proposal", "") or state.get("description", "")
     hashtags = state.get("strategy_hashtags", [])
 
     publish_mode = "proposal"
-    if _has_tiktok_credentials(settings):
-        publish_mode = "live" if settings.tiktok_access_token else "proposal"
+    publish_id: str | None = None
+    if state.get("validation_passed") and _has_tiktok_credentials(settings):
+        client = tiktok_client or TikTokClient(settings)
+        publish_id = client.publish_video(media_paths=media_paths, caption=caption)
+        if publish_id:
+            publish_mode = "live"
 
     structured: dict[str, str | list[str]] = {
         "publish_mode": publish_mode,
@@ -297,6 +301,8 @@ def tiktok_proposal_node(
         "hashtags": hashtags,
         "media_order": media_paths,
     }
+    if publish_id:
+        structured["publish_id"] = publish_id
 
     return {
         "media_paths": media_paths,

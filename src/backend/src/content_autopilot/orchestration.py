@@ -117,6 +117,11 @@ def execute_run(
 
     result = compiled_graph.invoke(initial_state)
 
+    if result.get("validation_passed") is False:
+        errors = result.get("validation_errors") or []
+        write("Validation failed: " + "; ".join(errors))
+        return 1
+
     x_post_url = result.get("x_post_url")
     write(f"X post URL: {x_post_url or 'none'}")
     structured = result.get("tiktok_proposal_structured") or {}

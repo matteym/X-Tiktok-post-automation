@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from content_autopilot.db.models import PostRun
 from content_autopilot.db.schema import init_schema
-from content_autopilot.settings import Settings
+from content_autopilot.settings import Settings, resolve_database_url, sqlalchemy_url
 
 
 class PostRunRepository:
@@ -21,7 +21,7 @@ class PostRunRepository:
 
     @classmethod
     def from_settings(cls, settings: Settings) -> PostRunRepository:
-        engine = create_engine(settings.database_url)
+        engine = create_engine(sqlalchemy_url(resolve_database_url(settings)))
         init_schema(engine)
         session = sessionmaker(bind=engine)()
         return cls(session)

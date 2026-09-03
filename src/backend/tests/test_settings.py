@@ -149,6 +149,56 @@ def test_load_settings_missing_grok_api_key_has_clear_error(
     assert "GROK_API_KEY" in message or "grok_api_key" in message
 
 
+def test_load_settings_accepts_xai_and_typo_x_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.settings import load_settings
+
+    _clear_settings_env(monkeypatch)
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+    monkeypatch.setenv("DATABASE_URL", REQUIRED_ENV["DATABASE_URL"])
+    monkeypatch.setenv("XAI_API_KEY", "from-xai")
+    monkeypatch.setenv("X_ACCES_TOKEN", "typo-token")
+    monkeypatch.setenv("X_ACCES_SECRET", "typo-secret")
+
+    settings = load_settings()
+
+    assert settings.grok_api_key == "from-xai"
+    assert settings.x_access_token == "typo-token"
+    assert settings.x_access_token_secret == "typo-secret"
+
+
+def test_resolve_database_url_falls_back_to_host_when_docker_name_does_not_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import socket
+
+    from content_autopilot.settings import Settings, resolve_database_url
+
+    _clear_settings_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", "postgres://app:secret@postgres:5432/app")
+    monkeypatch.setenv(
+        "DATABASE_URL_HOST", "postgres://app:secret@example.invalid:5432/app"
+    )
+    monkeypatch.setenv("GROK_API_KEY", "k")
+
+    def _fail_lookup(host, *args, **kwargs):
+        del args, kwargs
+        raise OSError("name not found")
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fail_lookup)
+    settings = Settings()
+    assert resolve_database_url(settings) == settings.database_url_host
+
+
+def test_sqlalchemy_url_uses_psycopg_driver() -> None:
+    from content_autopilot.settings import sqlalchemy_url
+
+    assert sqlalchemy_url("postgres://app:x@postgres:5432/app").startswith(
+        "postgresql+psycopg://"
+    )
+
+
 def test_load_settings_reads_dotenv_for_local_development(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

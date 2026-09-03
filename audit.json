@@ -1,0 +1,159 @@
+{
+  "generated_at": "2026-09-03T07:17:00Z",
+  "product": {
+    "repo": "matteym/X-Tiktok-post-automation",
+    "intent": "content-autopilot Python CLI: --video (order preserved), --description, optional --github/--tiktok; SHA-256+size fingerprints; Postgres dedup+confirm; LangGraph Understand→Research→Analyze→Strategy→Generate→Validate→Publish X / TikTok proposal; Grok; secrets from env",
+    "package": "src/backend (content-autopilot)",
+    "docs": ["infra.md"]
+  },
+  "yarn_task": {
+    "title": "content-autopilot python cli with langgraph dag",
+    "model": "composer-2.5",
+    "run_log": "agent-loop-autonomous-TDD-dag-runner/dag/logs/run-20260831-224319.log",
+    "started_at": "2026-08-31T20:43:19Z",
+    "finished_at": "2026-08-31T21:07:11Z",
+    "nodes_ok": 10,
+    "nodes_remaining_in_queue": 0,
+    "queue_file": "dag/metadata/task.json",
+    "queue_status": "empty (all archived to task.done.json)",
+    "publish": {
+      "branch": "agent/init",
+      "pr_reused_closed": "https://github.com/matteym/X-Tiktok-post-automation/pull/3",
+      "pr_merged": "https://github.com/matteym/X-Tiktok-post-automation/pull/4",
+      "origin_main": "6fb56aa Merge pull request #4 from matteym/agent/init"
+    }
+  },
+  "nodes_done": [
+    {
+      "id": "scaffold-content-autopilot-package",
+      "commit": "feat(backend): scaffold content-autopilot python package",
+      "sha": "200b5ce",
+      "finished_at": "2026-08-31T20:47:05Z",
+      "status": "finished"
+    },
+    {
+      "id": "postgres-compose-and-schema",
+      "commit": "feat(backend): add postgres compose and post schema",
+      "sha": "ca17bb1",
+      "finished_at": "2026-08-31T20:49:51Z",
+      "status": "finished"
+    },
+    {
+      "id": "media-sha256-fingerprint",
+      "commit": "feat(backend): add media sha256-size fingerprinting",
+      "sha": "9780551",
+      "finished_at": "2026-08-31T20:51:29Z",
+      "status": "finished"
+    },
+    {
+      "id": "env-settings-loader",
+      "commit": "feat(backend): add env settings for grok and apis",
+      "sha": "63b4da1",
+      "finished_at": "2026-08-31T20:53:23Z",
+      "status": "finished"
+    },
+    {
+      "id": "postgres-dedup-and-persist",
+      "commit": "feat(backend): add postgres dedup check and metadata persist",
+      "sha": "01fc70d",
+      "finished_at": "2026-08-31T20:55:26Z",
+      "status": "finished"
+    },
+    {
+      "id": "cli-media-args",
+      "commit": "feat(backend): add cli args for media and urls",
+      "sha": "146a9b6",
+      "finished_at": "2026-08-31T20:57:40Z",
+      "status": "finished"
+    },
+    {
+      "id": "langgraph-understand-research",
+      "commit": "feat(backend): add langgraph understand and research nodes",
+      "sha": "4ba30c2",
+      "finished_at": "2026-08-31T20:59:44Z",
+      "status": "finished"
+    },
+    {
+      "id": "langgraph-analyze-strategy-generate",
+      "commit": "feat(backend): add langgraph analyze strategy generate nodes",
+      "sha": "0fe4d1d",
+      "finished_at": "2026-08-31T21:02:08Z",
+      "status": "finished"
+    },
+    {
+      "id": "langgraph-validate-publish",
+      "commit": "feat(backend): add langgraph validate and publish nodes",
+      "sha": "929c446",
+      "finished_at": "2026-08-31T21:04:21Z",
+      "status": "finished"
+    },
+    {
+      "id": "cli-orchestration-run",
+      "commit": "feat(backend): wire cli orchestration with dedup prompt",
+      "sha": "be4e7b3",
+      "finished_at": "2026-08-31T21:07:11Z",
+      "status": "finished"
+    }
+  ],
+  "git": {
+    "product": {
+      "current_branch": "agent/init",
+      "head": "be4e7b3",
+      "tracks": "origin/agent/init (in sync)",
+      "local_main": "9908371 Initial commit — behind origin/main by 23 (stale checkout)",
+      "origin_main": "6fb56aa (PR #4 merged, DAG work is on GitHub main)",
+      "uncommitted_product_work": true,
+      "uncommitted_summary": "Post-DAG hardening not in any yarn task: live X/Apify/TikTok clients, oauth1, validate gate, settings aliases + psycopg, infra.md, tests"
+    },
+    "engine": {
+      "repo": "matteym/agent-loop-autonomous-TDD-dag-runner",
+      "branch": "main",
+      "head": "27ac643",
+      "tracks": "origin/main (clean)",
+      "notes": "PR reuse+merge fix (26e1a89) and env alias sync (27ac643) are on engine GitHub"
+    }
+  },
+  "readiness": {
+    "dag_queue": "complete",
+    "cli_skeleton": "complete",
+    "postgres_schema_dedup": "complete",
+    "langgraph_pipeline": "complete",
+    "live_x_apify_tiktok": "implemented locally, uncommitted, not on origin/main",
+    "e2e_live_apis": "not run",
+    "migrations": "create_all only, no Alembic"
+  },
+  "remaining": {
+    "yarn_task_queue": [],
+    "suggested_next_yarn_tasks": [
+      {
+        "intent": "Commit and land live X/Apify/TikTok clients, validate gate, env aliases, psycopg, infra.md on agent/init then merge to main",
+        "why": "Work exists in the working tree but is not in git; origin/main still has stub X/Apify/TikTok from the original DAG"
+      },
+      {
+        "intent": "Add Alembic migrations for post_runs instead of SQLAlchemy create_all",
+        "why": "Schema is bootstrap-only"
+      },
+      {
+        "intent": "Stream real LangGraph node progress in the CLI instead of printing all steps before invoke",
+        "why": "orchestration.py prints PIPELINE_STEPS then invokes"
+      },
+      {
+        "intent": "TikTok Direct Post (public) using TIKTOK_ACCESS_TOKEN, not inbox-only upload",
+        "why": "Current live path is inbox init + PUT upload_url"
+      },
+      {
+        "intent": "One live smoke run: docker compose up, content-autopilot run with a real video against X (and optional TikTok)",
+        "why": "pytest uses mocks and sqlite; no proven live post"
+      }
+    ],
+    "operator_git": [
+      "Checkout or fast-forward local main onto origin/main (6fb56aa); local main is still the initial commit",
+      "Commit uncommitted src/backend + infra.md on agent/init (exclude __pycache__ and .env)",
+      "Do not start a new yarn task until the working tree is clean except dag metadata/logs"
+    ],
+    "config_not_code": [
+      "TIKTOK_ACCESS_TOKEN must be a real OAuth access token for live TikTok; client key/secret alone are not enough",
+      "CLI on the host uses DATABASE_URL_HOST when hostname postgres does not resolve"
+    ]
+  }
+}
