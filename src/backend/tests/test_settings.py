@@ -9,7 +9,10 @@ import pytest
 from pydantic import ValidationError
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = BACKEND_ROOT.parent.parent
 SETTINGS_MODULE = BACKEND_ROOT / "src" / "content_autopilot" / "settings.py"
+ENV_EXAMPLE_FILE = REPO_ROOT / ".env.example"
+GITIGNORE_FILE = REPO_ROOT / ".gitignore"
 
 REQUIRED_ENV = {
     "DATABASE_URL": "postgres://app:secret@postgres:5432/app",
@@ -34,6 +37,8 @@ def _clear_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "TIKTOK_ACCESS_TOKEN",
         "TIKTOK_CLIENT_KEY",
         "TIKTOK_CLIENT_SECRET",
+        "YOUTUBE_CLIENT_SECRETS_FILE",
+        "YOUTUBE_TOKEN_FILE",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -117,6 +122,39 @@ def test_load_settings_leaves_optional_credentials_none_when_unset(
     assert settings.tiktok_access_token is None
     assert settings.tiktok_client_key is None
     assert settings.tiktok_client_secret is None
+    assert settings.youtube_client_secrets_file is None
+    assert settings.youtube_token_file is None
+
+
+def test_load_settings_reads_youtube_oauth_file_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.settings import load_settings
+
+    _clear_settings_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("YOUTUBE_CLIENT_SECRETS_FILE", "secrets/client.yt.json")
+    monkeypatch.setenv("YOUTUBE_TOKEN_FILE", "secrets/youtube_token.json")
+
+    settings = load_settings()
+
+    assert settings.youtube_client_secrets_file == "secrets/client.yt.json"
+    assert settings.youtube_token_file == "secrets/youtube_token.json"
+
+
+def test_env_example_documents_youtube_oauth_file_paths() -> None:
+    env_example = ENV_EXAMPLE_FILE.read_text(encoding="utf-8")
+
+    assert "YOUTUBE_CLIENT_SECRETS_FILE=" in env_example
+    assert "YOUTUBE_TOKEN_FILE=" in env_example
+
+
+def test_gitignore_ignores_youtube_oauth_artifacts() -> None:
+    gitignore = GITIGNORE_FILE.read_text(encoding="utf-8")
+
+    assert "client.yt.json" in gitignore
+    assert "*.yt.json" in gitignore
+    assert "youtube_token.json" in gitignore
 
 
 def test_load_settings_missing_database_url_has_clear_error(

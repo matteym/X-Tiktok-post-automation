@@ -13,5 +13,4 @@ dag/logs/*.log
 agent-loop-autonomous-TDD-dag-runner/
 client.yt.json
 *.yt.json
-client.yt.json
-*.yt.json
+youtube_token.json

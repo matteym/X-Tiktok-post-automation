@@ -12,6 +12,8 @@ dependencies = [
     "psycopg[binary]",
     "httpx",
     "python-dotenv",
+    "google-api-python-client",
+    "google-auth-oauthlib",
 ]
 
 [project.scripts]

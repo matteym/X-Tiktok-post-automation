@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     tiktok_access_token: str | None = None
     tiktok_client_key: str | None = None
     tiktok_client_secret: str | None = None
+    youtube_client_secrets_file: str | None = None
+    youtube_token_file: str | None = None
 
     x_api_base_url: str = Field(
         default="https://api.twitter.com",
