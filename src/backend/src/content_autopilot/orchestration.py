@@ -64,9 +64,11 @@ def execute_run(
     description: str,
     *,
     github_url: str | None = None,
+    twitter_url: str | None = None,
     tiktok_url: str | None = None,
     title: str | None = None,
     youtube_url: str | None = None,
+    publish_youtube: bool = True,
     settings: Settings | None = None,
     repository: PostRunRepository | None = None,
     graph: Any | None = None,
@@ -82,6 +84,7 @@ def execute_run(
             video_paths=video_paths,
             description=description,
             github_url=github_url,
+            twitter_url=twitter_url,
             tiktok_url=tiktok_url,
             title=title,
             youtube_url=youtube_url,
@@ -107,7 +110,10 @@ def execute_run(
             write("Aborted.")
             return 0
 
-    compiled_graph = graph or build_content_autopilot_graph(active_settings)
+    compiled_graph = graph or build_content_autopilot_graph(
+        active_settings,
+        publish_youtube=publish_youtube,
+    )
     initial_state = {
         "description": collected.description,
         "title": collected.title,
@@ -115,6 +121,7 @@ def execute_run(
         "media_paths": [str(path) for path in collected.video_paths],
         "media_fingerprints": collected.media_fingerprints,
         "github_url": collected.github_url,
+        "twitter_url": collected.twitter_url,
         "tiktok_url": collected.tiktok_url,
         "youtube_url": collected.youtube_url,
     }
@@ -150,6 +157,7 @@ def execute_run(
         description=collected.description,
         title=collected.title,
         github_url=collected.github_url,
+        twitter_url=collected.twitter_url,
         tiktok_url=collected.tiktok_url,
         youtube_url=collected.youtube_url,
         x_post_url=x_post_url,

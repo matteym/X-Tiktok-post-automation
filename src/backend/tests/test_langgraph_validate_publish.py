@@ -139,6 +139,7 @@ def test_publish_youtube_node_uploads_first_video_when_valid(
     call_kwargs = mock_youtube_client.upload_video.call_args.kwargs
     assert call_kwargs["media_paths"] == GENERATED_STATE["media_paths"]
     assert call_kwargs["title"] == GENERATED_STATE["youtube_title"]
+    assert call_kwargs["description"] == GENERATED_STATE["youtube_description"]
     assert result["youtube_video_url"] == "https://www.youtube.com/watch?v=published-video-id"
 
 
@@ -405,6 +406,33 @@ def test_build_content_autopilot_graph_accepts_injected_youtube_client(
     )
 
     assert "publish_youtube" in set(graph.get_graph().nodes.keys())
+
+
+def test_build_content_autopilot_graph_skips_youtube_client_when_disabled(
+    settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.graph.workflow import build_content_autopilot_graph
+
+    def _fail_youtube_client(*_args, **_kwargs):
+        raise AssertionError("YouTubeClient must not be constructed when publish_youtube is false")
+
+    monkeypatch.setattr(
+        "content_autopilot.graph.workflow.YouTubeClient",
+        _fail_youtube_client,
+    )
+
+    graph = build_content_autopilot_graph(
+        settings,
+        grok_client=MagicMock(),
+        x_client=MagicMock(),
+        apify_client=MagicMock(),
+        tiktok_client=MagicMock(),
+        publish_youtube=False,
+    )
+
+    assert "publish_youtube" in set(graph.get_graph().nodes.keys())
+
 
 
 def test_graph_invoke_preserves_media_paths_through_publish_flow(

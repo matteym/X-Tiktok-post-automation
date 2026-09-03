@@ -36,11 +36,15 @@ def run(
     ],
     github: Annotated[
         str | None,
-        typer.Option("--github", help="Optional GitHub URL for context"),
+        typer.Option("--github", help="GitHub repo URL appended to YouTube and X captions"),
+    ] = None,
+    twitter: Annotated[
+        str | None,
+        typer.Option("--twitter", help="X/Twitter account URL appended to the YouTube caption"),
     ] = None,
     tiktok: Annotated[
         str | None,
-        typer.Option("--tiktok", help="Optional TikTok input URL for context"),
+        typer.Option("--tiktok", help="TikTok account URL appended to YouTube and X captions"),
     ] = None,
     title: Annotated[
         str | None,
@@ -50,18 +54,24 @@ def run(
         str | None,
         typer.Option(
             "--youtube",
-            help="Optional YouTube research URL for context (not the published watch URL)",
+            help="YouTube channel URL appended to the X caption",
         ),
     ] = None,
+    no_youtube: Annotated[
+        bool,
+        typer.Option("--no-youtube", help="Skip YouTube upload; still publish to X"),
+    ] = False,
 ) -> None:
     """Run dedup checks, LangGraph pipeline, and metadata persistence."""
     exit_code = execute_run(
         video_paths=video,
         description=description,
         github_url=github,
+        twitter_url=twitter,
         tiktok_url=tiktok,
         title=title,
         youtube_url=youtube,
+        publish_youtube=not no_youtube,
         echo=typer.echo,
     )
     raise typer.Exit(code=exit_code)

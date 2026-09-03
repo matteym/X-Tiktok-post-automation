@@ -20,6 +20,7 @@ REQUIRED_POST_RUN_COLUMNS = {
     "description",
     "title",
     "github_url",
+    "twitter_url",
     "tiktok_url",
     "x_post_url",
     "youtube_url",
@@ -87,6 +88,7 @@ def test_persist_post_run_with_ordered_media_metadata(db_session: Session) -> No
         description="Launch day recap",
         title="Launch day recap",
         github_url="https://github.com/example/repo",
+        twitter_url="https://x.com/example",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         x_post_url="https://x.com/example/status/99",
         youtube_url="https://www.youtube.com/watch?v=research-hint",
@@ -104,6 +106,7 @@ def test_persist_post_run_with_ordered_media_metadata(db_session: Session) -> No
     assert stored.description == "Launch day recap"
     assert stored.title == "Launch day recap"
     assert stored.github_url == "https://github.com/example/repo"
+    assert stored.twitter_url == "https://x.com/example"
     assert stored.tiktok_url == "https://www.tiktok.com/@creator/video/1"
     assert stored.x_post_url == "https://x.com/example/status/99"
     assert stored.youtube_url == "https://www.youtube.com/watch?v=research-hint"
@@ -122,6 +125,7 @@ def test_persist_post_run_allows_optional_urls_to_be_null(db_session: Session) -
         description="Minimal run",
         title=None,
         github_url=None,
+        twitter_url=None,
         tiktok_url=None,
         x_post_url=None,
         youtube_url=None,
@@ -135,6 +139,7 @@ def test_persist_post_run_allows_optional_urls_to_be_null(db_session: Session) -
     stored = db_session.query(PostRun).filter_by(media_set_hash="set-hash-minimal").one()
     assert stored.title is None
     assert stored.github_url is None
+    assert stored.twitter_url is None
     assert stored.tiktok_url is None
     assert stored.x_post_url is None
     assert stored.youtube_url is None

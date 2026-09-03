@@ -15,6 +15,7 @@ RESEARCHED_STATE: dict[str, Any] = {
     "filenames": ["clip.mp4", "cover.jpg"],
     "media_fingerprints": ["deadbeef:1024", "cafebabe:2048"],
     "github_url": "https://github.com/example/repo",
+    "twitter_url": "https://x.com/example",
     "tiktok_url": "https://www.tiktok.com/@creator/video/1",
     "youtube_url": "https://www.youtube.com/watch?v=research-hint",
     "media_count": 2,
@@ -133,9 +134,15 @@ def test_generate_node_drafts_x_post_and_tiktok_proposal(
     result = generate_node(state, grok_client=mock_grok_client)
 
     assert "CLI workflow" in result["x_post_text"]
+    assert "GitHub: https://github.com/example/repo" in result["x_post_text"]
+    assert "YouTube: https://www.youtube.com/watch?v=research-hint" in result["x_post_text"]
+    assert "TikTok: https://www.tiktok.com/@creator/video/1" in result["x_post_text"]
     assert "TikTok proposal" in result["tiktok_proposal"]
     assert "Launch recap" in result["youtube_title"]
     assert "ordered media upload" in result["youtube_description"]
+    assert "GitHub: https://github.com/example/repo" in result["youtube_description"]
+    assert "X: https://x.com/example" in result["youtube_description"]
+    assert "TikTok: https://www.tiktok.com/@creator/video/1" in result["youtube_description"]
     mock_grok_client.generate.assert_called_once()
     prompt = mock_grok_client.generate.call_args.args[0]
     assert state["strategy_angle"] in prompt

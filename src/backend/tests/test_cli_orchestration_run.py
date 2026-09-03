@@ -169,6 +169,7 @@ def test_execute_run_invokes_full_langgraph_dag(
         video_paths=[first, second],
         description="Launch recap",
         github_url="https://github.com/example/repo",
+        twitter_url="https://x.com/example",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         title="Launch recap title",
         youtube_url="https://www.youtube.com/watch?v=research-hint",
@@ -187,6 +188,7 @@ def test_execute_run_invokes_full_langgraph_dag(
     assert invoked_state["title"] == "Launch recap title"
     assert invoked_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
     assert invoked_state["github_url"] == "https://github.com/example/repo"
+    assert invoked_state["twitter_url"] == "https://x.com/example"
     assert invoked_state["tiktok_url"] == "https://www.tiktok.com/@creator/video/1"
 
 
@@ -211,6 +213,7 @@ def test_execute_run_persists_metadata_after_success(
         video_paths=[first, second],
         description="Launch recap",
         github_url="https://github.com/example/repo",
+        twitter_url="https://x.com/example",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         title="Launch recap title",
         youtube_url="https://www.youtube.com/watch?v=research-hint",
@@ -229,6 +232,7 @@ def test_execute_run_persists_metadata_after_success(
     assert stored[0].description == "Launch recap"
     assert stored[0].title == "Launch recap title"
     assert stored[0].github_url == "https://github.com/example/repo"
+    assert stored[0].twitter_url == "https://x.com/example"
     assert stored[0].tiktok_url == "https://www.tiktok.com/@creator/video/1"
     assert stored[0].youtube_url == "https://www.youtube.com/watch?v=research-hint"
     assert stored[0].x_post_url == MOCK_GRAPH_RESULT["x_post_url"]

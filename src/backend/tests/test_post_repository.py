@@ -88,6 +88,7 @@ def test_save_post_metadata_persists_post_run(db_session: Session) -> None:
         description="Launch recap",
         title="Launch recap",
         github_url="https://github.com/example/repo",
+        twitter_url="https://x.com/example",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
         x_post_url="https://x.com/example/status/99",
         youtube_url="https://www.youtube.com/watch?v=research-hint",
@@ -104,6 +105,7 @@ def test_save_post_metadata_persists_post_run(db_session: Session) -> None:
     assert stored.description == "Launch recap"
     assert stored.title == "Launch recap"
     assert stored.github_url == "https://github.com/example/repo"
+    assert stored.twitter_url == "https://x.com/example"
     assert stored.tiktok_url == "https://www.tiktok.com/@creator/video/1"
     assert stored.x_post_url == "https://x.com/example/status/99"
     assert stored.youtube_url == "https://www.youtube.com/watch?v=research-hint"

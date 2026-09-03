@@ -16,6 +16,7 @@ SAMPLE_STATE: dict[str, Any] = {
     "filenames": ["clip.mp4", "cover.jpg"],
     "media_fingerprints": ["deadbeef:1024", "cafebabe:2048"],
     "github_url": "https://github.com/example/repo",
+    "twitter_url": "https://x.com/example",
     "tiktok_url": "https://www.tiktok.com/@creator/video/1",
     "youtube_url": "https://www.youtube.com/watch?v=research-hint",
 }
@@ -83,6 +84,7 @@ def test_content_autopilot_state_is_typed_dict() -> None:
     assert "description" in annotations
     assert "understanding_summary" in annotations
     assert "research_summary" in annotations
+    assert "twitter_url" in annotations
     assert "youtube_url" in annotations
     assert "youtube_title" in annotations
     assert "youtube_description" in annotations
@@ -142,6 +144,7 @@ def test_understand_node_includes_optional_url_hints(
     result = understand_node(SAMPLE_STATE, grok_client=mock_grok_client)
 
     assert "github.com/example/repo" in result["understanding_summary"]
+    assert "x.com/example" in result["understanding_summary"]
     assert "tiktok.com/@creator/video/1" in result["understanding_summary"]
 
 

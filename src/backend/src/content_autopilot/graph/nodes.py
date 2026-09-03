@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from content_autopilot.graph.captions import tiktok_caption, x_post_caption, youtube_caption
 from content_autopilot.graph.clients import TikTokClient, _has_tiktok_credentials
 from content_autopilot.graph.state import ContentAutopilotState
 from content_autopilot.settings import Settings
@@ -33,7 +35,9 @@ class ApifyClientProtocol(Protocol):
 class YouTubeClientProtocol(Protocol):
     def has_credentials(self) -> bool: ...
 
-    def upload_video(self, *, media_paths: Sequence[str], title: str) -> str: ...
+    def upload_video(
+        self, *, media_paths: Sequence[str], title: str, description: str = ""
+    ) -> str: ...
 
 
 def infer_media_type(filename: str) -> str:
@@ -56,6 +60,7 @@ def understand_node(
     media_types = [infer_media_type(name) for name in filenames]
     description = state.get("description", "")
     github_url = state.get("github_url")
+    twitter_url = state.get("twitter_url")
     tiktok_url = state.get("tiktok_url")
     youtube_url = state.get("youtube_url")
 
@@ -67,6 +72,8 @@ def understand_node(
     ]
     if github_url:
         prompt_parts.append(f"GitHub hint: {github_url}")
+    if twitter_url:
+        prompt_parts.append(f"X hint: {twitter_url}")
     if tiktok_url:
         prompt_parts.append(f"TikTok hint: {tiktok_url}")
     if youtube_url:
@@ -79,6 +86,8 @@ def understand_node(
     ]
     if github_url:
         summary_parts.append(f"GitHub hint: {github_url}")
+    if twitter_url:
+        summary_parts.append(f"X hint: {twitter_url}")
     if tiktok_url:
         summary_parts.append(f"TikTok hint: {tiktok_url}")
     if youtube_url:
@@ -104,10 +113,13 @@ def research_node(
 
     research_urls: list[str] = []
     github_url = state.get("github_url")
+    twitter_url = state.get("twitter_url")
     tiktok_url = state.get("tiktok_url")
     youtube_url = state.get("youtube_url")
     if github_url:
         research_urls.append(github_url)
+    if twitter_url:
+        research_urls.append(twitter_url)
     if tiktok_url:
         research_urls.append(tiktok_url)
     if youtube_url:
@@ -239,6 +251,27 @@ def generate_node(
     )
     if cli_title:
         youtube_title = cli_title
+    github_url = state.get("github_url")
+    twitter_url = state.get("twitter_url")
+    tiktok_url = state.get("tiktok_url")
+    x_post_text = x_post_caption(
+        x_post_text,
+        github_url=github_url,
+        youtube_url=youtube_url,
+        tiktok_url=tiktok_url,
+    )
+    tiktok_proposal = tiktok_caption(
+        tiktok_proposal,
+        github_url=github_url,
+        twitter_url=twitter_url,
+        youtube_url=youtube_url,
+    )
+    youtube_description = youtube_caption(
+        youtube_description or state.get("description", ""),
+        github_url=github_url,
+        twitter_url=twitter_url,
+        tiktok_url=tiktok_url,
+    )
     return {
         "x_post_text": x_post_text,
         "tiktok_proposal": tiktok_proposal,
@@ -366,8 +399,10 @@ def publish_youtube_node(
         or state.get("title")
         or state.get("description", "")
     )
+    description = state.get("youtube_description") or state.get("description", "")
     result["youtube_video_url"] = youtube_client.upload_video(
         media_paths=media_paths,
         title=title,
+        description=description,
     )
     return result
