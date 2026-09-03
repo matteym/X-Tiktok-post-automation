@@ -30,6 +30,12 @@ class ApifyClientProtocol(Protocol):
     def research_urls(self, urls: list[str]) -> str | None: ...
 
 
+class YouTubeClientProtocol(Protocol):
+    def has_credentials(self) -> bool: ...
+
+    def upload_video(self, *, media_paths: Sequence[str], title: str) -> str: ...
+
+
 def infer_media_type(filename: str) -> str:
     suffix = Path(filename).suffix.lower()
     if suffix in VIDEO_EXTENSIONS:
@@ -334,3 +340,34 @@ def tiktok_proposal_node(
         "media_paths": media_paths,
         "tiktok_proposal_structured": structured,
     }
+
+
+def publish_youtube_node(
+    state: ContentAutopilotState,
+    *,
+    settings: Settings,
+    youtube_client: YouTubeClientProtocol,
+) -> ContentAutopilotState:
+    """Upload the first video to YouTube when validation passed and OAuth is configured."""
+    _ = settings
+    media_paths = _resolved_media_paths(state)
+    result: ContentAutopilotState = {"media_paths": media_paths}
+
+    if not state.get("validation_passed", False):
+        result["youtube_video_url"] = None
+        return result
+
+    if not youtube_client.has_credentials():
+        result["youtube_video_url"] = None
+        return result
+
+    title = (
+        state.get("youtube_title")
+        or state.get("title")
+        or state.get("description", "")
+    )
+    result["youtube_video_url"] = youtube_client.upload_video(
+        media_paths=media_paths,
+        title=title,
+    )
+    return result
