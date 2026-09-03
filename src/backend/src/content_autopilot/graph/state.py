@@ -13,6 +13,7 @@ class ContentAutopilotState(TypedDict, total=False):
     media_paths: list[str]
     media_fingerprints: list[str]
     github_url: str | None
+    twitter_url: str | None
     tiktok_url: str | None
     youtube_url: str | None
     title: str | None

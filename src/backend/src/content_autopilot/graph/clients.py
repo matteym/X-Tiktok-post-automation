@@ -319,7 +319,13 @@ class YouTubeClient:
     def has_credentials(self) -> bool:
         return _has_youtube_credentials(self._settings)
 
-    def upload_video(self, *, media_paths: Sequence[str], title: str) -> str:
+    def upload_video(
+        self,
+        *,
+        media_paths: Sequence[str],
+        title: str,
+        description: str = "",
+    ) -> str:
         if not self.has_credentials() or self._youtube_service is None:
             raise ValueError("YouTube credentials not configured")
         video_path = _first_video_path(media_paths)
@@ -336,7 +342,7 @@ class YouTubeClient:
             .insert(
                 part="snippet,status",
                 body={
-                    "snippet": {"title": title},
+                    "snippet": {"title": title, "description": description},
                     "status": {"privacyStatus": "public"},
                 },
                 media_body=media_body,

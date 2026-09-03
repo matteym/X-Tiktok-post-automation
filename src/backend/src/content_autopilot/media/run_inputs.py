@@ -20,6 +20,7 @@ class RunMediaInputs:
     description: str
     title: str
     github_url: str | None
+    twitter_url: str | None
     tiktok_url: str | None
     youtube_url: str | None
     media_fingerprints: list[str]
@@ -45,6 +46,7 @@ def collect_run_media(
     video_paths: Sequence[Path | str],
     description: str,
     github_url: str | None = None,
+    twitter_url: str | None = None,
     tiktok_url: str | None = None,
     title: str | None = None,
     youtube_url: str | None = None,
@@ -65,6 +67,7 @@ def collect_run_media(
         description=description,
         title=derive_title(description, title=title),
         github_url=github_url,
+        twitter_url=twitter_url,
         tiktok_url=tiktok_url,
         youtube_url=youtube_url,
         media_fingerprints=fingerprints,

@@ -79,6 +79,7 @@ def test_collect_run_media_preserves_video_order_and_fingerprints(
     assert collected.media_set_hash == _expected_set_hash(collected.media_fingerprints)
     assert collected.description == "Launch recap"
     assert collected.github_url is None
+    assert collected.twitter_url is None
     assert collected.tiktok_url is None
 
 
@@ -92,10 +93,12 @@ def test_collect_run_media_accepts_optional_urls(
         video_paths=[first],
         description="With links",
         github_url="https://github.com/example/repo",
+        twitter_url="https://x.com/example",
         tiktok_url="https://www.tiktok.com/@creator/video/1",
     )
 
     assert collected.github_url == "https://github.com/example/repo"
+    assert collected.twitter_url == "https://x.com/example"
     assert collected.tiktok_url == "https://www.tiktok.com/@creator/video/1"
 
 
@@ -242,8 +245,12 @@ def test_cli_run_accepts_multiple_videos_and_optional_urls(
             str(third),
             "--github",
             "https://github.com/example/repo",
+            "--twitter",
+            "https://x.com/example",
             "--tiktok",
             "https://www.tiktok.com/@creator/video/1",
+            "--youtube",
+            "https://www.youtube.com/@example",
         ],
     )
 
@@ -297,6 +304,8 @@ def test_cli_run_accepts_title_and_youtube_and_threads_graph_state(
             "Launch recap",
             "--youtube",
             "https://www.youtube.com/watch?v=research-hint",
+            "--twitter",
+            "https://x.com/example",
         ],
     )
 
@@ -305,6 +314,7 @@ def test_cli_run_accepts_title_and_youtube_and_threads_graph_state(
     initial_state = mock_graph.invoke.call_args.args[0]
     assert initial_state["title"] == "Launch recap"
     assert initial_state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
+    assert initial_state["twitter_url"] == "https://x.com/example"
     assert "YouTube" in result.stdout
     assert "https://www.youtube.com/watch?v=published-from-cli" in result.stdout
 

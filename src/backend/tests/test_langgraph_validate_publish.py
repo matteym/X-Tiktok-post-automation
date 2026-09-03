@@ -139,6 +139,7 @@ def test_publish_youtube_node_uploads_first_video_when_valid(
     call_kwargs = mock_youtube_client.upload_video.call_args.kwargs
     assert call_kwargs["media_paths"] == GENERATED_STATE["media_paths"]
     assert call_kwargs["title"] == GENERATED_STATE["youtube_title"]
+    assert call_kwargs["description"] == GENERATED_STATE["youtube_description"]
     assert result["youtube_video_url"] == "https://www.youtube.com/watch?v=published-video-id"
 
 

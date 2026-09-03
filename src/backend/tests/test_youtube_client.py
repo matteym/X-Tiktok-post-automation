@@ -128,11 +128,15 @@ def test_youtube_client_upload_video_skips_photos_and_uploads_first_video(
     watch_url = client.upload_video(
         media_paths=[str(cover), str(first_video), str(second_video)],
         title="Launch recap",
+        description="Launch recap with GitHub: https://github.com/example/repo",
     )
 
     assert watch_url == f"{WATCH_URL_PREFIX}uploaded-video-id"
     body = mock_service.videos.return_value.insert.call_args.kwargs["body"]
     assert body["snippet"]["title"] == "Launch recap"
+    assert body["snippet"]["description"] == (
+        "Launch recap with GitHub: https://github.com/example/repo"
+    )
     media_body = mock_service.videos.return_value.insert.call_args.kwargs["media_body"]
     assert media_body is not None
     assert str(first_video) in str(getattr(media_body, "filename", media_body))

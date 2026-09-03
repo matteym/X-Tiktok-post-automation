@@ -39,6 +39,7 @@ class PostRun(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     github_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    twitter_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     tiktok_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     x_post_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     youtube_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
