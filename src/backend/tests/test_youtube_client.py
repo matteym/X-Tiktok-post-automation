@@ -166,3 +166,12 @@ def test_youtube_client_builds_service_from_settings_paths(
     assert captured["secrets_file"] == youtube_settings.youtube_client_secrets_file
     assert captured["token_file"] == youtube_settings.youtube_token_file
     assert captured["scopes"] == [YOUTUBE_UPLOAD_SCOPE]
+
+
+def test_disabled_youtube_client_reports_no_credentials() -> None:
+    from content_autopilot.graph.clients import DisabledYouTubeClient
+
+    client = DisabledYouTubeClient()
+
+    assert client.has_credentials() is False
+

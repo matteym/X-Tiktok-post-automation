@@ -57,6 +57,10 @@ def run(
             help="YouTube channel URL appended to the X caption",
         ),
     ] = None,
+    no_youtube: Annotated[
+        bool,
+        typer.Option("--no-youtube", help="Skip YouTube upload; still publish to X"),
+    ] = False,
 ) -> None:
     """Run dedup checks, LangGraph pipeline, and metadata persistence."""
     exit_code = execute_run(
@@ -67,6 +71,7 @@ def run(
         tiktok_url=tiktok,
         title=title,
         youtube_url=youtube,
+        publish_youtube=not no_youtube,
         echo=typer.echo,
     )
     raise typer.Exit(code=exit_code)

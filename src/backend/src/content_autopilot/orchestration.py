@@ -68,6 +68,7 @@ def execute_run(
     tiktok_url: str | None = None,
     title: str | None = None,
     youtube_url: str | None = None,
+    publish_youtube: bool = True,
     settings: Settings | None = None,
     repository: PostRunRepository | None = None,
     graph: Any | None = None,
@@ -109,7 +110,10 @@ def execute_run(
             write("Aborted.")
             return 0
 
-    compiled_graph = graph or build_content_autopilot_graph(active_settings)
+    compiled_graph = graph or build_content_autopilot_graph(
+        active_settings,
+        publish_youtube=publish_youtube,
+    )
     initial_state = {
         "description": collected.description,
         "title": collected.title,

@@ -355,3 +355,47 @@ def test_cli_run_derives_title_from_description_when_omitted(
     initial_state = mock_graph.invoke.call_args.args[0]
     assert initial_state["title"] == long_description[:TITLE_MAX_LENGTH]
     assert initial_state.get("youtube_url") is None
+
+
+def test_cli_run_no_youtube_skips_youtube_publish(
+    media_files: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from content_autopilot.cli import app
+
+    first, _, _ = media_files
+    mock_graph = MagicMock()
+    mock_graph.invoke.return_value = {
+        "x_post_url": "https://x.com/example/status/123456789",
+        "youtube_video_url": None,
+        "validation_passed": True,
+    }
+    captured: dict[str, object] = {}
+
+    def _build_graph(_settings, **kwargs):
+        captured.update(kwargs)
+        return mock_graph
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setenv("GROK_API_KEY", "test-grok-api-key")
+    monkeypatch.setattr(
+        "content_autopilot.orchestration.build_content_autopilot_graph",
+        _build_graph,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--description",
+            "Launch recap X only",
+            "--video",
+            str(first),
+            "--no-youtube",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stderr or result.stdout
+    assert captured.get("publish_youtube") is False
+    assert "https://x.com/example/status/123456789" in result.stdout
+

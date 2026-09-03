@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from content_autopilot.graph.clients import (
     ApifyClient,
+    DisabledYouTubeClient,
     GrokClient,
     TikTokClient,
     XClient,
@@ -73,14 +74,20 @@ def build_content_autopilot_graph(
     x_client: XClient | None = None,
     apify_client: ApifyClient | None = None,
     tiktok_client: TikTokClient | None = None,
-    youtube_client: YouTubeClient | None = None,
+    youtube_client: YouTubeClient | DisabledYouTubeClient | None = None,
+    publish_youtube: bool = True,
 ):
     """Build START -> understand -> research -> analyze -> strategy -> generate -> validate -> publish_x -> tiktok_proposal -> publish_youtube."""
     grok = grok_client or GrokClient(settings)
     x = x_client or XClient(settings)
     apify = apify_client or ApifyClient(settings)
     tiktok = tiktok_client or TikTokClient(settings)
-    youtube = youtube_client or YouTubeClient(settings)
+    if youtube_client is not None:
+        youtube = youtube_client
+    elif publish_youtube:
+        youtube = YouTubeClient(settings)
+    else:
+        youtube = DisabledYouTubeClient()
 
     def understand(state: ContentAutopilotState) -> ContentAutopilotState:
         return understand_node(state, grok_client=grok)

@@ -296,6 +296,23 @@ class TikTokClient:
         return str(publish_id) if publish_id else str(upload_url)
 
 
+class DisabledYouTubeClient:
+    """No-op YouTube client used when ``--no-youtube`` skips upload."""
+
+    def has_credentials(self) -> bool:
+        return False
+
+    def upload_video(
+        self,
+        *,
+        media_paths: Sequence[str],
+        title: str,
+        description: str = "",
+    ) -> str:
+        _ = media_paths, title, description
+        raise ValueError("YouTube publish is disabled")
+
+
 class YouTubeClient:
     """YouTube Data API v3 resumable upload client using OAuth installed-app flow."""
 
