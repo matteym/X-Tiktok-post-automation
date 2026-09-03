@@ -186,7 +186,7 @@ L’orchestrateur (`dag/src/init/env-sync.ts`) relit l’env **au start du loop 
 # docker-compose.yml
 postgres:
   image: postgres:16-alpine
-  ports: ["5432:5432"]
+  ports: ["5433:5432"]  # host 5433; container still 5432 (avoids local postgres.exe)
   env: POSTGRES_USER / PASSWORD / DB
   volume: pgdata
   healthcheck: pg_isready

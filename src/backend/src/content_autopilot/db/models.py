@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, TypeDecorator
+from sqlalchemy import JSON, DateTime, Integer, String, Text, TypeDecorator
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.types import JSON
+
+# Postgres JSON has no ``=`` operator; JSONB does. SQLite keeps generic JSON.
+ComparableJSON = JSON().with_variant(JSONB(), "postgresql")
 
 
 class UTCDateTime(TypeDecorator[datetime]):
@@ -34,8 +37,8 @@ class PostRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     media_set_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    media_fingerprints: Mapped[list[str]] = mapped_column(JSON, nullable=False)
-    filenames: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    media_fingerprints: Mapped[list[str]] = mapped_column(ComparableJSON, nullable=False)
+    filenames: Mapped[list[str]] = mapped_column(ComparableJSON, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     github_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
