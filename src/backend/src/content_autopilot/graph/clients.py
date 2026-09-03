@@ -43,7 +43,7 @@ class GrokClient:
                 "Content-Type": "application/json",
             },
             json={
-                "model": os.environ.get("XAI_MODEL", "grok-2-latest"),
+                "model": os.environ.get("XAI_MODEL", "grok-4-latest"),
                 "messages": [{"role": "user", "content": prompt}],
             },
         )

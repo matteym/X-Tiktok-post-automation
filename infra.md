@@ -160,7 +160,7 @@ Le CLI n’utilise pas `DATABASE_URL` aveuglément : si le hostname docker (`pos
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | Requis avec le token pour considérer les credentials TikTok complets. |
 | `TIKTOK_API_BASE_URL` | défaut `https://open.tiktokapis.com` |
 | `XAI_API_BASE_URL` | défaut `https://api.x.ai/v1` |
-| `XAI_MODEL` | défaut `grok-2-latest` |
+| `XAI_MODEL` | défaut `grok-4-latest` |
 | `APP_PORT` | héritage init (pas utilisé par le CLI) |
 | `CURSOR_API_KEY` | moteur DAG uniquement, pas l’app |
 
