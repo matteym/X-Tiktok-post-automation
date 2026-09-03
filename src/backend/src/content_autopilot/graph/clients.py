@@ -337,7 +337,7 @@ class YouTubeClient:
                 part="snippet,status",
                 body={
                     "snippet": {"title": title},
-                    "status": {"privacyStatus": "private"},
+                    "status": {"privacyStatus": "public"},
                 },
                 media_body=media_body,
             )
