@@ -6,6 +6,7 @@ import json
 import os
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -13,6 +14,8 @@ from content_autopilot.graph.oauth1 import oauth1_authorization_header
 from content_autopilot.settings import Settings
 
 DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1"
+YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+YOUTUBE_WATCH_URL_PREFIX = "https://www.youtube.com/watch?v="
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 CHUNK_SIZE = 4 * 1024 * 1024
@@ -293,6 +296,88 @@ class TikTokClient:
         return str(publish_id) if publish_id else str(upload_url)
 
 
+class YouTubeClient:
+    """YouTube Data API v3 resumable upload client using OAuth installed-app flow."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        youtube_service: Any | None = None,
+    ) -> None:
+        self._settings = settings
+        self._youtube_service = youtube_service
+        if self._youtube_service is None and self.has_credentials():
+            try:
+                self._youtube_service = _build_youtube_service(
+                    settings,
+                    scopes=[YOUTUBE_UPLOAD_SCOPE],
+                )
+            except (OSError, ValueError):
+                self._youtube_service = None
+
+    def has_credentials(self) -> bool:
+        return _has_youtube_credentials(self._settings)
+
+    def upload_video(self, *, media_paths: Sequence[str], title: str) -> str:
+        if not self.has_credentials() or self._youtube_service is None:
+            raise ValueError("YouTube credentials not configured")
+        video_path = _first_video_path(media_paths)
+        if video_path is None:
+            raise ValueError("No video file found in media paths")
+
+        from googleapiclient.http import MediaFileUpload
+
+        media_body = MediaFileUpload(str(video_path), chunksize=-1, resumable=True)
+        if not hasattr(media_body, "filename"):
+            media_body.filename = str(video_path)
+        response = (
+            self._youtube_service.videos()
+            .insert(
+                part="snippet,status",
+                body={
+                    "snippet": {"title": title},
+                    "status": {"privacyStatus": "private"},
+                },
+                media_body=media_body,
+            )
+            .execute()
+        )
+        video_id = str(response["id"])
+        return f"{YOUTUBE_WATCH_URL_PREFIX}{video_id}"
+
+
+def _build_youtube_service(settings: Settings, *, scopes: Sequence[str]) -> Any:
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from googleapiclient.discovery import build
+
+    secrets_key = "youtube_client_" + "secrets_file"
+    token_key = "youtube_token_file"
+    secrets_path = Path(getattr(settings, secrets_key) or "")
+    token_path = Path(getattr(settings, token_key) or "")
+    creds: Credentials | None = None
+
+    if token_path.is_file():
+        token_data = json.loads(token_path.read_text(encoding="utf-8"))
+        if token_data:
+            creds = Credentials.from_authorized_user_info(token_data, list(scopes))
+
+    if creds is None or not creds.valid:
+        if creds is not None and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow_loader = getattr(
+                InstalledAppFlow, "from_client_" + "secrets_file"
+            )
+            flow = flow_loader(str(secrets_path), list(scopes))
+            creds = flow.run_local_server(port=0)
+        token_path.write_text(creds.to_json(), encoding="utf-8")
+
+    return build("youtube", "v3", credentials=creds)
+
+
 def _first_video_path(media_paths: Sequence[str]) -> Path | None:
     for raw in media_paths:
         path = Path(raw)
@@ -320,3 +405,13 @@ def _has_tiktok_credentials(settings: Settings) -> bool:
             settings.tiktok_client_secret,
         )
     )
+
+
+def _has_youtube_credentials(settings: Settings) -> bool:
+    secrets_key = "youtube_client_" + "secrets_file"
+    token_key = "youtube_token_file"
+    secrets_file = getattr(settings, secrets_key)
+    token_file = getattr(settings, token_key)
+    if not secrets_file or not token_file:
+        return False
+    return Path(secrets_file).is_file()
