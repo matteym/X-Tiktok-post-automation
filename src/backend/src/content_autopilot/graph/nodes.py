@@ -51,6 +51,7 @@ def understand_node(
     description = state.get("description", "")
     github_url = state.get("github_url")
     tiktok_url = state.get("tiktok_url")
+    youtube_url = state.get("youtube_url")
 
     prompt_parts = [
         "Understand this content-autopilot post request.",
@@ -62,6 +63,8 @@ def understand_node(
         prompt_parts.append(f"GitHub hint: {github_url}")
     if tiktok_url:
         prompt_parts.append(f"TikTok hint: {tiktok_url}")
+    if youtube_url:
+        prompt_parts.append(f"YouTube hint: {youtube_url}")
 
     grok_summary = grok_client.generate("\n".join(prompt_parts))
     summary_parts = [
@@ -72,6 +75,8 @@ def understand_node(
         summary_parts.append(f"GitHub hint: {github_url}")
     if tiktok_url:
         summary_parts.append(f"TikTok hint: {tiktok_url}")
+    if youtube_url:
+        summary_parts.append(f"YouTube hint: {youtube_url}")
 
     return {
         "media_count": media_count,
@@ -94,10 +99,13 @@ def research_node(
     research_urls: list[str] = []
     github_url = state.get("github_url")
     tiktok_url = state.get("tiktok_url")
+    youtube_url = state.get("youtube_url")
     if github_url:
         research_urls.append(github_url)
     if tiktok_url:
         research_urls.append(tiktok_url)
+    if youtube_url:
+        research_urls.append(youtube_url)
 
     web_research: str | None = None
     if settings.apify_api_token and research_urls:
@@ -136,16 +144,22 @@ def _parse_strategy_response(text: str) -> tuple[str, str, list[str]]:
     return angle, tone, hashtags
 
 
-def _parse_generate_response(text: str) -> tuple[str, str]:
+def _parse_generate_response(text: str) -> tuple[str, str, str, str]:
     x_post_text = text.strip()
     tiktok_proposal = text.strip()
+    youtube_title = ""
+    youtube_description = ""
     for line in text.splitlines():
         lowered = line.lower()
         if lowered.startswith("x post:"):
             x_post_text = line.strip()
         elif lowered.startswith("tiktok proposal:"):
             tiktok_proposal = line.strip()
-    return x_post_text, tiktok_proposal
+        elif lowered.startswith("youtube title:"):
+            youtube_title = line.split(":", 1)[1].strip()
+        elif lowered.startswith("youtube description:"):
+            youtube_description = line.split(":", 1)[1].strip()
+    return x_post_text, tiktok_proposal, youtube_title, youtube_description
 
 
 def analyze_node(
@@ -195,23 +209,35 @@ def generate_node(
     *,
     grok_client: GrokClientProtocol,
 ) -> ContentAutopilotState:
-    """Draft the X post text and TikTok proposal caption/script."""
+    """Draft the X post text, TikTok proposal, and YouTube snippet metadata."""
     hashtags = state.get("strategy_hashtags", [])
-    prompt = "\n".join(
-        [
-            "Generate draft content for X and TikTok.",
-            f"Description: {state.get('description', '')}",
-            f"Strategy angle: {state.get('strategy_angle', '')}",
-            f"Strategy tone: {state.get('strategy_tone', '')}",
-            f"Strategy hashtags: {' '.join(hashtags)}",
-            "Return X post and TikTok proposal on separate lines.",
-        ]
+    cli_title = state.get("title")
+    youtube_url = state.get("youtube_url")
+    prompt_parts = [
+        "Generate draft content for X, TikTok, and YouTube.",
+        f"Description: {state.get('description', '')}",
+        f"Strategy angle: {state.get('strategy_angle', '')}",
+        f"Strategy tone: {state.get('strategy_tone', '')}",
+        f"Strategy hashtags: {' '.join(hashtags)}",
+    ]
+    if youtube_url:
+        prompt_parts.append(f"YouTube hint: {youtube_url}")
+    if cli_title:
+        prompt_parts.append(f"Default YouTube title: {cli_title}")
+    prompt_parts.append(
+        "Return X post, TikTok proposal, YouTube title, and YouTube description on separate lines."
     )
-    generated = grok_client.generate(prompt)
-    x_post_text, tiktok_proposal = _parse_generate_response(generated)
+    generated = grok_client.generate("\n".join(prompt_parts))
+    x_post_text, tiktok_proposal, youtube_title, youtube_description = (
+        _parse_generate_response(generated)
+    )
+    if cli_title:
+        youtube_title = cli_title
     return {
         "x_post_text": x_post_text,
         "tiktok_proposal": tiktok_proposal,
+        "youtube_title": youtube_title,
+        "youtube_description": youtube_description,
     }
 
 

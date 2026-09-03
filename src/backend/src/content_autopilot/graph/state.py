@@ -14,6 +14,8 @@ class ContentAutopilotState(TypedDict, total=False):
     media_fingerprints: list[str]
     github_url: str | None
     tiktok_url: str | None
+    youtube_url: str | None
+    title: str | None
     media_count: int
     media_types: list[str]
     understanding_summary: str
@@ -26,6 +28,9 @@ class ContentAutopilotState(TypedDict, total=False):
     strategy_hashtags: list[str]
     x_post_text: str
     tiktok_proposal: str
+    youtube_title: str
+    youtube_description: str
+    youtube_video_url: str | None
     validation_passed: bool
     validation_errors: list[str]
     x_post_url: str | None

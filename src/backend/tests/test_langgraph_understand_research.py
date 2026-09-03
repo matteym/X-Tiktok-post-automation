@@ -17,6 +17,7 @@ SAMPLE_STATE: dict[str, Any] = {
     "media_fingerprints": ["deadbeef:1024", "cafebabe:2048"],
     "github_url": "https://github.com/example/repo",
     "tiktok_url": "https://www.tiktok.com/@creator/video/1",
+    "youtube_url": "https://www.youtube.com/watch?v=research-hint",
 }
 
 
@@ -82,6 +83,24 @@ def test_content_autopilot_state_is_typed_dict() -> None:
     assert "description" in annotations
     assert "understanding_summary" in annotations
     assert "research_summary" in annotations
+    assert "youtube_url" in annotations
+    assert "youtube_title" in annotations
+    assert "youtube_description" in annotations
+    assert "youtube_video_url" in annotations
+
+
+def test_content_autopilot_state_accepts_youtube_metadata_fields() -> None:
+    from content_autopilot.graph.state import ContentAutopilotState
+
+    state: ContentAutopilotState = {
+        "youtube_url": "https://www.youtube.com/watch?v=research-hint",
+        "youtube_title": "Launch recap",
+        "youtube_description": "See how the CLI workflow speeds up publishing.",
+        "youtube_video_url": "https://www.youtube.com/watch?v=published-id",
+    }
+
+    assert state["youtube_url"] == "https://www.youtube.com/watch?v=research-hint"
+    assert state["youtube_title"] == "Launch recap"
 
 
 def test_build_understand_research_graph_wires_start_understand_research(
@@ -126,7 +145,47 @@ def test_understand_node_includes_optional_url_hints(
     assert "tiktok.com/@creator/video/1" in result["understanding_summary"]
 
 
-def test_research_node_gathers_x_context_when_credentials_available(
+def test_understand_node_includes_youtube_url_hint(
+    mock_grok_client: MagicMock,
+) -> None:
+    from content_autopilot.graph.nodes import understand_node
+
+    result = understand_node(SAMPLE_STATE, grok_client=mock_grok_client)
+
+    assert "youtube.com/watch?v=research-hint" in result["understanding_summary"]
+    prompt = mock_grok_client.generate.call_args.args[0]
+    assert "youtube.com/watch?v=research-hint" in prompt
+
+
+def test_research_node_includes_youtube_url_in_apify_research(
+    settings,
+    mock_grok_client: MagicMock,
+    mock_x_client: MagicMock,
+    mock_apify_client: MagicMock,
+) -> None:
+    from content_autopilot.graph.nodes import research_node
+
+    state = {
+        **SAMPLE_STATE,
+        "understanding_summary": "Understood launch recap with two media files",
+        "media_count": 2,
+        "media_types": ["video", "photo"],
+    }
+
+    research_node(
+        state,
+        settings=settings,
+        grok_client=mock_grok_client,
+        x_client=mock_x_client,
+        apify_client=mock_apify_client,
+    )
+
+    mock_apify_client.research_urls.assert_called_once()
+    researched_urls = mock_apify_client.research_urls.call_args.args[0]
+    assert "https://www.youtube.com/watch?v=research-hint" in researched_urls
+
+
+def test_build_understand_research_graph_wires_start_understand_research(
     settings,
     mock_grok_client: MagicMock,
     mock_x_client: MagicMock,
