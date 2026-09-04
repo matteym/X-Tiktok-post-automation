@@ -1,0 +1,20 @@
+[project]
+name = "x-tiktok-post-automation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "matteym", email = "matt.eymeoud@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.2.3",
+    "sqlalchemy>=2.0.52",
+]
+
+[project.scripts]
+x-tiktok-post-automation = "x_tiktok_post_automation:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"

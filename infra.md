@@ -160,7 +160,7 @@ Le CLI n’utilise pas `DATABASE_URL` aveuglément : si le hostname docker (`pos
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | Requis avec le token pour considérer les credentials TikTok complets. |
 | `TIKTOK_API_BASE_URL` | défaut `https://open.tiktokapis.com` |
 | `XAI_API_BASE_URL` | défaut `https://api.x.ai/v1` |
-| `XAI_MODEL` | défaut `grok-2-latest` |
+| `XAI_MODEL` | défaut `grok-4-latest` |
 | `APP_PORT` | héritage init (pas utilisé par le CLI) |
 | `CURSOR_API_KEY` | moteur DAG uniquement, pas l’app |
 
@@ -186,7 +186,7 @@ L’orchestrateur (`dag/src/init/env-sync.ts`) relit l’env **au start du loop 
 # docker-compose.yml
 postgres:
   image: postgres:16-alpine
-  ports: ["5432:5432"]
+  ports: ["5433:5432"]  # host 5433; container still 5432 (avoids local postgres.exe)
   env: POSTGRES_USER / PASSWORD / DB
   volume: pgdata
   healthcheck: pg_isready

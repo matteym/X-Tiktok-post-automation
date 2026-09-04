@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+import httpx
+
 from content_autopilot.graph.captions import tiktok_caption, x_post_caption, youtube_caption
 from content_autopilot.graph.clients import TikTokClient, _has_tiktok_credentials
 from content_autopilot.graph.state import ContentAutopilotState
@@ -332,10 +334,14 @@ def publish_x_node(
         result["x_post_url"] = None
         return result
 
-    result["x_post_url"] = x_client.publish_post(
-        media_paths=media_paths,
-        text=state.get("x_post_text", ""),
-    )
+    try:
+        result["x_post_url"] = x_client.publish_post(
+            media_paths=media_paths,
+            text=state.get("x_post_text", ""),
+        )
+    except httpx.HTTPStatusError:
+        # Keep TikTok/YouTube running when X rejects auth/upload (401/403).
+        result["x_post_url"] = None
     return result
 
 

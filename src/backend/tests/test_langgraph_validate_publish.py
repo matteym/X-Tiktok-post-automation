@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -52,10 +53,17 @@ def settings(monkeypatch: pytest.MonkeyPatch):
 def settings_without_x_credentials(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
     monkeypatch.setenv("GROK_API_KEY", "test-grok-api-key")
-    monkeypatch.delenv("X_API_KEY", raising=False)
-    monkeypatch.delenv("X_API_SECRET", raising=False)
-    monkeypatch.delenv("X_ACCESS_TOKEN", raising=False)
-    monkeypatch.delenv("X_ACCESS_TOKEN_SECRET", raising=False)
+    # Empty (not deleted): load_dotenv(override=False) would refill from .env.
+    for key in (
+        "X_API_KEY",
+        "X_API_SECRET",
+        "X_ACCESS_TOKEN",
+        "X_ACCESS_TOKEN_SECRET",
+        "X_ACCES_TOKEN",
+        "X_ACCES_SECRET",
+        "X_ACCESS_SECRET",
+    ):
+        monkeypatch.setenv(key, "")
 
     from content_autopilot.settings import load_settings
 
@@ -287,6 +295,33 @@ def test_publish_x_node_skips_live_publish_without_credentials(
         validated_state,
         settings=settings_without_x_credentials,
         x_client=x_client,
+    )
+
+    assert result["x_post_url"] is None
+
+
+def test_publish_x_node_soft_fails_on_http_error(
+    settings,
+) -> None:
+    import content_autopilot.graph.nodes as graph_nodes
+
+    client = MagicMock()
+    client.has_credentials.return_value = True
+    client.publish_post.side_effect = httpx.HTTPStatusError(
+        "401",
+        request=httpx.Request("POST", "https://upload.twitter.com/1.1/media/upload.json"),
+        response=httpx.Response(401),
+    )
+    validated_state = {
+        **GENERATED_STATE,
+        "validation_passed": True,
+        "validation_errors": [],
+    }
+
+    result = graph_nodes.publish_x_node(
+        validated_state,
+        settings=settings,
+        x_client=client,
     )
 
     assert result["x_post_url"] is None
