@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -19,6 +21,8 @@ YOUTUBE_WATCH_URL_PREFIX = "https://www.youtube.com/watch?v="
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 CHUNK_SIZE = 4 * 1024 * 1024
+MEDIA_STATUS_MAX_WAIT_SECONDS = 120
+MEDIA_STATUS_POLL_SECONDS = 2
 
 
 class GrokClient:
@@ -62,7 +66,7 @@ class XClient:
         http_client: httpx.Client | None = None,
     ) -> None:
         self._settings = settings
-        self._http_client = http_client or httpx.Client(timeout=60.0)
+        self._http_client = http_client or httpx.Client(timeout=120.0)
 
     def fetch_context(self) -> str | None:
         if not self.has_credentials():
@@ -73,7 +77,9 @@ class XClient:
             url,
             params={"count": "5", "trim_user": "true"},
         )
-        response.raise_for_status()
+        # Timeline read is optional enrichment; Free/Basic apps often get 403.
+        if response.is_error:
+            return None
         tweets = response.json()
         if not isinstance(tweets, list) or not tweets:
             return None
@@ -155,7 +161,41 @@ class XClient:
             params={"command": "FINALIZE", "media_id": media_id},
         )
         finalize.raise_for_status()
+        self._wait_for_video_processing(upload_url, media_id, finalize.json())
         return media_id
+
+    def _wait_for_video_processing(
+        self,
+        upload_url: str,
+        media_id: str,
+        finalize_payload: dict[str, Any],
+    ) -> None:
+        """Poll STATUS until X finishes processing the uploaded video."""
+        info = finalize_payload.get("processing_info")
+        if not isinstance(info, dict):
+            return
+        deadline = time.monotonic() + MEDIA_STATUS_MAX_WAIT_SECONDS
+        while True:
+            state = str(info.get("state") or "")
+            if state == "succeeded":
+                return
+            if state == "failed":
+                raise RuntimeError(f"X media processing failed for {media_id}: {info}")
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"X media processing timed out for {media_id}")
+            wait_for = int(info.get("check_after_secs") or MEDIA_STATUS_POLL_SECONDS)
+            time.sleep(max(wait_for, 1))
+            status = self._signed_request(
+                "GET",
+                upload_url,
+                params={"command": "STATUS", "media_id": media_id},
+            )
+            status.raise_for_status()
+            payload = status.json()
+            next_info = payload.get("processing_info")
+            if not isinstance(next_info, dict):
+                return
+            info = next_info
 
     def _signed_request(
         self,
@@ -167,16 +207,26 @@ class XClient:
         files: dict[str, object] | None = None,
     ) -> httpx.Response:
         request_url = url
+        form_params: dict[str, str] | None = None
         if params:
-            query = "&".join(f"{key}={value}" for key, value in params.items())
-            request_url = url + ("&" if "?" in url else "?") + query
+            if method.upper() == "POST" and json_body is None and files is None:
+                # INIT/FINALIZE: form body params must be in the OAuth base string.
+                form_params = dict(params)
+            else:
+                query = "&".join(
+                    f"{quote(str(key), safe='')}={quote(str(value), safe='')}"
+                    for key, value in params.items()
+                )
+                request_url = url + ("&" if "?" in url else "?") + query
+
         header = oauth1_authorization_header(
             method=method,
-            url=request_url if json_body or files else request_url,
+            url=request_url,
             consumer_key=self._settings.x_api_key or "",
             consumer_secret=self._settings.x_api_secret or "",
             token=self._settings.x_access_token or "",
             token_secret=self._settings.x_access_token_secret or "",
+            extra_params=form_params,
         )
         headers = {"Authorization": header}
         if json_body is not None:
@@ -187,6 +237,10 @@ class XClient:
         if files is not None:
             return self._http_client.request(
                 method, request_url, headers=headers, files=files
+            )
+        if form_params is not None:
+            return self._http_client.request(
+                method, request_url, headers=headers, data=form_params
             )
         return self._http_client.request(method, request_url, headers=headers)
 
