@@ -17,6 +17,58 @@ VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 MAX_X_POST_LENGTH = 280
 
+# Lightweight stopword scores — no extra dependency.
+_LANGUAGE_STOPWORDS: dict[str, frozenset[str]] = {
+    "French": frozenset(
+        "le la les un une des et est dans pour qui que avec sur ce cette ces pas "
+        "plus une du de au aux je tu il elle nous vous ils elles mon ton son "
+        "mais ou où donc car très aussi comme".split()
+    ),
+    "English": frozenset(
+        "the a an and is in for that with on this these not more of to from "
+        "are was were be been being it as by or at we you they my your".split()
+    ),
+    "Spanish": frozenset(
+        "el la los las un una y es en para que con por del de al se no más "
+        "como pero su sus".split()
+    ),
+    "German": frozenset(
+        "der die das ein eine und ist in für dass mit auf dem den des nicht "
+        "auch wie aber".split()
+    ),
+    "Italian": frozenset(
+        "il lo la i gli le un una e è in per che con di del della non più "
+        "come ma".split()
+    ),
+}
+
+
+def detect_description_language(description: str) -> str:
+    """Guess the description language from stopword overlap; default English."""
+    tokens = {
+        token.strip(".,!?;:\"'()[]{}").lower()
+        for token in description.split()
+        if token.strip(".,!?;:\"'()[]{}")
+    }
+    if not tokens:
+        return "English"
+    scores = {
+        name: len(tokens & words) for name, words in _LANGUAGE_STOPWORDS.items()
+    }
+    best_name, best_score = max(scores.items(), key=lambda item: item[1])
+    if best_score == 0:
+        return "English"
+    return best_name
+
+
+def _same_language_instruction(description: str) -> str:
+    language = detect_description_language(description)
+    return (
+        f"Detected language: {language}. "
+        f"Write all user-facing copy (X post, TikTok proposal, YouTube title, "
+        f"YouTube description) entirely in {language}."
+    )
+
 
 class GrokClientProtocol(Protocol):
     def generate(self, prompt: str) -> str: ...
@@ -207,11 +259,14 @@ def strategy_node(
     grok_client: GrokClientProtocol,
 ) -> ContentAutopilotState:
     """Define the X and TikTok angle, tone, and hashtags."""
+    description = state.get("description", "")
+    language = detect_description_language(description)
     prompt = "\n".join(
         [
             "Create a cross-platform content strategy for X and TikTok.",
-            f"Description: {state.get('description', '')}",
+            f"Description: {description}",
             f"Analysis insights: {state.get('analysis_insights', '')}",
+            f"Detected language: {language}. Keep Angle, Tone, and Hashtags aligned with {language}.",
             "Return Angle, Tone, and Hashtags on separate lines.",
         ]
     )
@@ -233,12 +288,14 @@ def generate_node(
     hashtags = state.get("strategy_hashtags", [])
     cli_title = state.get("title")
     youtube_url = state.get("youtube_url")
+    description = state.get("description", "")
     prompt_parts = [
         "Generate draft content for X, TikTok, and YouTube.",
-        f"Description: {state.get('description', '')}",
+        f"Description: {description}",
         f"Strategy angle: {state.get('strategy_angle', '')}",
         f"Strategy tone: {state.get('strategy_tone', '')}",
         f"Strategy hashtags: {' '.join(hashtags)}",
+        _same_language_instruction(description),
     ]
     if youtube_url:
         prompt_parts.append(f"YouTube hint: {youtube_url}")

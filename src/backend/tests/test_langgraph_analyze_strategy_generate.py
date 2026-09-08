@@ -148,6 +148,43 @@ def test_generate_node_drafts_x_post_and_tiktok_proposal(
     assert state["strategy_angle"] in prompt
     assert "#buildinpublic" in prompt
     assert RESEARCHED_STATE["youtube_url"] in prompt
+    assert "Detected language: English" in prompt
+    assert "entirely in English" in prompt
+
+
+def test_detect_description_language_french() -> None:
+    from content_autopilot.graph.nodes import detect_description_language
+
+    assert (
+        detect_description_language(
+            "Ceci est une collection de fonctions pour le robot avec des gestes."
+        )
+        == "French"
+    )
+
+
+def test_generate_node_instructs_french_when_description_is_french(
+    mock_grok_client: MagicMock,
+) -> None:
+    from content_autopilot.graph.nodes import generate_node
+
+    state = {
+        **RESEARCHED_STATE,
+        "description": (
+            "Ceci est une démo du robot avec des gestes pour les développeurs."
+        ),
+        "analysis_insights": "Key insight",
+        "strategy_angle": "humour",
+        "strategy_tone": "décalé",
+        "strategy_hashtags": ["#robot"],
+    }
+    mock_grok_client.generate.return_value = GENERATE_GROK_RESPONSE
+
+    generate_node(state, grok_client=mock_grok_client)
+
+    prompt = mock_grok_client.generate.call_args.args[0]
+    assert "Detected language: French" in prompt
+    assert "entirely in French" in prompt
 
 
 def test_generate_node_uses_cli_title_as_youtube_title_default(
@@ -204,8 +241,9 @@ def test_graph_invoke_stores_analyze_strategy_generate_outputs(
     graph = build_content_autopilot_graph(
         settings,
         grok_client=mock_grok_client,
-        x_client=MagicMock(fetch_context=lambda: None),
+        x_client=MagicMock(fetch_context=lambda: None, has_credentials=lambda: False),
         apify_client=MagicMock(research_urls=lambda urls: None),
+        publish_youtube=False,
     )
 
     initial_state = {
